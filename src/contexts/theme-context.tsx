@@ -49,14 +49,26 @@ function getStored() {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const stored = getStored();
-  const [mode,       setModeState]       = useState<ThemeMode>(stored.mode);
-  const [accent,     setAccentState]     = useState<ThemeAccent>(stored.accent);
-  const [fontSize,   setFontSizeState]   = useState<FontSize>(stored.fontSize);
-  const [animations, setAnimationsState] = useState<boolean>(stored.animations);
-  const [compact,    setCompactState]    = useState<boolean>(stored.compact);
+  const [mode,       setModeState]       = useState<ThemeMode>("dark");
+  const [accent,     setAccentState]     = useState<ThemeAccent>("blue");
+  const [fontSize,   setFontSizeState]   = useState<FontSize>("normal");
+  const [animations, setAnimationsState] = useState<boolean>(true);
+  const [compact,    setCompactState]    = useState<boolean>(false);
+  const [mounted,    setMounted]         = useState(false);
+
+  // Load from localStorage only after hydration to avoid mismatch
+  useEffect(() => {
+    const stored = getStored();
+    setModeState(stored.mode);
+    setAccentState(stored.accent);
+    setFontSizeState(stored.fontSize);
+    setAnimationsState(stored.animations);
+    setCompactState(stored.compact);
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
+    if (!mounted) return;
     const el = document.documentElement;
     el.setAttribute("data-theme",      mode);
     el.setAttribute("data-accent",     accent);
@@ -68,7 +80,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem("theme-font-size",  fontSize);
     localStorage.setItem("theme-animations", String(animations));
     localStorage.setItem("theme-compact",    String(compact));
-  }, [mode, accent, fontSize, animations, compact]);
+  }, [mode, accent, fontSize, animations, compact, mounted]);
 
   return (
     <ThemeContext.Provider value={{
