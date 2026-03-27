@@ -24,7 +24,7 @@ export function CustomerForm({ defaultValues, onSubmit, isLoading, onCancel }: C
       name: defaultValues?.name ?? "",
       phone: defaultValues?.phone ?? "",
       city: defaultValues?.city ?? "",
-      platform: defaultValues?.platform ?? undefined,
+      platform: (defaultValues?.platform ?? undefined) as CreateCustomerInput["platform"],
       socialMediaUrl: defaultValues?.socialMediaUrl ?? "",
       address: defaultValues?.address ?? "",
     },

@@ -34,7 +34,6 @@ async function seed() {
       shopName: "My Shop",
       customerIdPrefix: "CUST",
       orderIdPrefix: "ORD",
-      currency: "USD",
     });
     console.log("✅ Created default shop settings");
   } else {

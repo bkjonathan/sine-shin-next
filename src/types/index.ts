@@ -68,6 +68,13 @@ export type OrderWithCustomer = Order & {
   customer: Pick<Customer, "id" | "name" | "customerId"> | null;
 };
 
+export type OrderListItem = Pick<Order, "id" | "orderId" | "customerId" | "status" | "shippingFee" | "deliveryFee" | "cargoFee" | "serviceFee" | "exchangeRate" | "createdAt" | "deletedAt"> & {
+  customerName: string | null;
+  customerDisplayId: string | null;
+  totalQty: number;
+  totalWeight: number;
+};
+
 export type OrderWithItems = Order & {
   items: OrderItem[];
   customer: Pick<Customer, "id" | "name" | "customerId"> | null;

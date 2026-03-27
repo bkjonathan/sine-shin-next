@@ -2,6 +2,7 @@
 
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { createOrderSchema, ORDER_STATUSES, type CreateOrderInput } from "@/validations/order.schema";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassSelect } from "@/components/ui/glass-select";
@@ -30,7 +31,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
     watch,
     setValue,
     formState: { errors },
-  } = useForm<CreateOrderInput>({
+  } = useForm<z.input<typeof createOrderSchema>, unknown, CreateOrderInput>({
     resolver: zodResolver(createOrderSchema),
     defaultValues: {
       customerId: defaultValues?.customerId ?? "",

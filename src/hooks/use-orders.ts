@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/axios";
 import { toast } from "sonner";
-import type { Order, OrderWithItems, ListParams, ApiSuccess, PaginationMeta } from "@/types";
+import type { Order, OrderListItem, OrderWithItems, ListParams, ApiSuccess, PaginationMeta } from "@/types";
 import type { CreateOrderInput, UpdateOrderInput } from "@/validations/order.schema";
 
 const QUERY_KEY = "orders";
@@ -12,7 +12,7 @@ export function useOrders(params: ListParams & { status?: string } = {}) {
   return useQuery({
     queryKey: [QUERY_KEY, params],
     queryFn: async () => {
-      const { data } = await api.get<ApiSuccess<Order[]> & { meta: PaginationMeta }>("/orders", { params });
+      const { data } = await api.get<ApiSuccess<OrderListItem[]> & { meta: PaginationMeta }>("/orders", { params });
       return data;
     },
   });

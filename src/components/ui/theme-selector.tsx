@@ -45,7 +45,6 @@ export function ThemeSelector() {
             )}
             style={{
               backgroundColor: a.color,
-              ringColor: a.color,
               boxShadow: accent === a.value ? `0 0 0 2px ${a.color}` : undefined,
             }}
           />
