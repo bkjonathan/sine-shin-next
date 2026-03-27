@@ -15,19 +15,27 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, Number(searchParams.get("page") ?? 1));
     const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
     const search = searchParams.get("search") ?? "";
+    const searchField = searchParams.get("searchField") ?? "orderId";
     const status = searchParams.get("status") ?? "";
     const sort = searchParams.get("sort") ?? "createdAt";
     const order = searchParams.get("order") === "asc" ? "asc" : "desc";
     const offset = (page - 1) * limit;
 
-    const baseWhere = isNull(orders.deletedAt);
-    const statusWhere = status ? eq(orders.status, status) : undefined;
-    const searchWhere = search ? ilike(orders.orderId, `%${search}%`) : undefined;
+    const baseConditions = [isNull(orders.deletedAt)];
+    if (status) baseConditions.push(eq(orders.status, status));
+    if (search) {
+      baseConditions.push(
+        searchField === "customerName"
+          ? ilike(customers.name, `%${search}%`)
+          : ilike(orders.orderId, `%${search}%`)
+      );
+    }
+    const whereClause = and(...(baseConditions as Parameters<typeof and>));
 
-    const conditions = [baseWhere, statusWhere, searchWhere].filter(Boolean);
-    const whereClause = conditions.length > 1 ? and(...(conditions as Parameters<typeof and>)) : conditions[0];
-
-    const sortCol = sort === "status" ? orders.status : orders.createdAt;
+    const sortCol =
+      sort === "status" ? orders.status :
+      sort === "orderId" ? orders.orderId :
+      orders.createdAt;
     const orderFn = order === "asc" ? asc : desc;
 
     const [rows, [{ count }]] = await Promise.all([
@@ -46,6 +54,8 @@ export async function GET(req: NextRequest) {
           deletedAt: orders.deletedAt,
           customerName: customers.name,
           customerDisplayId: customers.customerId,
+          totalQty: sql<number>`(SELECT COALESCE(SUM(oi.product_qty), 0)::int FROM order_items oi WHERE oi.order_id = ${orders.id} AND oi.deleted_at IS NULL)`,
+          totalWeight: sql<number>`(SELECT COALESCE(SUM(oi.product_weight), 0) FROM order_items oi WHERE oi.order_id = ${orders.id} AND oi.deleted_at IS NULL)`,
         })
         .from(orders)
         .leftJoin(customers, eq(orders.customerId, customers.id))
@@ -53,7 +63,11 @@ export async function GET(req: NextRequest) {
         .orderBy(orderFn(sortCol))
         .limit(limit)
         .offset(offset),
-      db.select({ count: sql<number>`count(*)::int` }).from(orders).where(whereClause),
+      db
+        .select({ count: sql<number>`count(distinct ${orders.id})::int` })
+        .from(orders)
+        .leftJoin(customers, eq(orders.customerId, customers.id))
+        .where(whereClause),
     ]);
 
     return NextResponse.json({

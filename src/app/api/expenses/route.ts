@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, Number(searchParams.get("page") ?? 1));
     const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
     const search = searchParams.get("search") ?? "";
+    const searchField = searchParams.get("searchField") ?? "title";
     const category = searchParams.get("category") ?? "";
     const dateFrom = searchParams.get("dateFrom") ?? "";
     const dateTo = searchParams.get("dateTo") ?? "";
@@ -22,25 +23,59 @@ export async function GET(req: NextRequest) {
     const order = searchParams.get("order") === "asc" ? "asc" : "desc";
     const offset = (page - 1) * limit;
 
-    const base = isNull(expenses.deletedAt);
+    const searchWhere = search
+      ? searchField === "expenseId"
+        ? ilike(expenses.expenseId, `%${search}%`)
+        : ilike(expenses.description, `%${search}%`)
+      : undefined;
+
     const whereClause = and(
-      base,
-      search ? ilike(expenses.description, `%${search}%`) : undefined,
+      isNull(expenses.deletedAt),
+      searchWhere,
       category ? eq(expenses.category, category) : undefined,
       dateFrom ? gte(expenses.date, dateFrom) : undefined,
       dateTo ? lte(expenses.date, dateTo) : undefined,
     );
-    const sortCol = sort === "amount" ? expenses.amount : sort === "category" ? expenses.category : expenses.date;
+
+    const sortCol =
+      sort === "amount" ? expenses.amount :
+      sort === "title" ? expenses.description :
+      sort === "expenseId" ? expenses.expenseId :
+      expenses.date;
     const orderFn = order === "asc" ? asc : desc;
 
-    const [rows, [{ count }]] = await Promise.all([
+    const globalBase = isNull(expenses.deletedAt);
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const nextMonthStart = now.getMonth() === 11
+      ? `${now.getFullYear() + 1}-01-01`
+      : `${now.getFullYear()}-${String(now.getMonth() + 2).padStart(2, "0")}-01`;
+
+    const [rows, [{ count }], [globalStats]] = await Promise.all([
       db.select().from(expenses).where(whereClause).orderBy(orderFn(sortCol)).limit(limit).offset(offset),
       db.select({ count: sql<number>`count(*)::int` }).from(expenses).where(whereClause),
+      db.select({
+        globalCount: sql<number>`count(*)::int`,
+        globalTotal: sql<number>`COALESCE(SUM(amount), 0)`,
+        thisMonthTotal: sql<number>`COALESCE(SUM(CASE WHEN expense_date >= ${monthStart} AND expense_date < ${nextMonthStart} THEN amount ELSE 0 END), 0)`,
+      }).from(expenses).where(globalBase),
     ]);
+
+    const avgAmount = globalStats.globalCount > 0
+      ? globalStats.globalTotal / globalStats.globalCount
+      : 0;
 
     return NextResponse.json({
       data: rows,
-      meta: { page, limit, total: count, totalPages: Math.ceil(count / limit) },
+      meta: {
+        page, limit, total: count, totalPages: Math.ceil(count / limit),
+        stats: {
+          records: globalStats.globalCount,
+          totalAmount: globalStats.globalTotal,
+          thisMonthAmount: globalStats.thisMonthTotal,
+          avgAmount,
+        },
+      },
     });
   } catch (err) {
     console.error("[GET /api/expenses]", err);
@@ -59,7 +94,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [expense] = await db.insert(expenses).values({ id: nanoid(), ...parsed.data }).returning();
+    const [{ maxNum }] = await db.select({
+      maxNum: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(expense_id, '-', 2) AS INTEGER)), 0)`,
+    }).from(expenses);
+    const expenseId = `EXP-${String(maxNum + 1).padStart(5, "0")}`;
+
+    const [expense] = await db.insert(expenses).values({
+      id: nanoid(),
+      expenseId,
+      ...parsed.data,
+    }).returning();
     return NextResponse.json({ data: expense }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/expenses]", err);

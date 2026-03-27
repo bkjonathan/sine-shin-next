@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { customers } from "@/db/schema";
-import { isNull, ilike, or, desc, asc, sql, eq } from "drizzle-orm";
+import { isNull, ilike, desc, asc, sql, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createCustomerSchema } from "@/validations/customer.schema";
 import { auth } from "@/lib/auth";
@@ -15,20 +15,21 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, Number(searchParams.get("page") ?? 1));
     const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
     const search = searchParams.get("search") ?? "";
-    const sort = searchParams.get("sort") ?? "createdAt";
+    const searchField = searchParams.get("searchField") ?? "name";
+    const sort = searchParams.get("sort") ?? "customerId";
     const order = searchParams.get("order") === "asc" ? "asc" : "desc";
     const offset = (page - 1) * limit;
 
     const whereClause = isNull(customers.deletedAt);
     const searchClause = search
-      ? or(
-          ilike(customers.name, `%${search}%`),
-          ilike(customers.customerId, `%${search}%`),
-          ilike(customers.phone, `%${search}%`)
-        )
+      ? searchField === "customerId"
+        ? ilike(customers.customerId, `%${search}%`)
+        : searchField === "phone"
+        ? ilike(customers.phone, `%${search}%`)
+        : ilike(customers.name, `%${search}%`)
       : undefined;
 
-    const sortCol = sort === "name" ? customers.name : sort === "customerId" ? customers.customerId : customers.createdAt;
+    const sortCol = sort === "name" ? customers.name : sort === "createdAt" ? customers.createdAt : customers.customerId;
     const orderFn = order === "asc" ? asc : desc;
 
     const [rows, [{ count }]] = await Promise.all([

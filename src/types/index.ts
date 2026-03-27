@@ -37,11 +37,19 @@ export type UserRole = "owner" | "staff";
 
 // ── API response envelope ─────────────────────────────────────────────────────
 
+export interface ExpenseStats {
+  records: number;
+  totalAmount: number;
+  thisMonthAmount: number;
+  avgAmount: number;
+}
+
 export interface PaginationMeta {
   page: number;
   limit: number;
   total: number;
   totalPages: number;
+  stats?: ExpenseStats;
 }
 
 export interface ApiSuccess<T> {
@@ -71,6 +79,7 @@ export interface ListParams {
   page?: number;
   limit?: number;
   search?: string;
+  searchField?: string;
   sort?: string;
   order?: "asc" | "desc";
 }

@@ -283,3 +283,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .mobile-safe-bottom {
   padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
 }
+
+/* ─── FONT SIZE ────────────────────────────────────────────────── */
+[data-font-size="small"]  { font-size: 13px; }
+[data-font-size="normal"] { font-size: 14px; }
+[data-font-size="large"]  { font-size: 16px; }
+[data-font-size="x-large"] { font-size: 18px; }
+
+/* ─── ANIMATIONS OFF ───────────────────────────────────────────── */
+[data-animations="false"] *,
+[data-animations="false"] *::before,
+[data-animations="false"] *::after {
+  transition-duration: 0.01ms !important;
+  animation-duration:  0.01ms !important;
+}
+
+/* ─── COMPACT MODE ─────────────────────────────────────────────── */
+[data-compact="true"] .space-y-6 > * + * { margin-top: 0.75rem; }
+[data-compact="true"] .space-y-4 > * + * { margin-top: 0.5rem; }
+[data-compact="true"] .p-6  { padding: 1rem; }
+[data-compact="true"] .p-5  { padding: 0.875rem; }

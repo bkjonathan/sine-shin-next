@@ -1,7 +1,8 @@
-import { pgTable, text, timestamp, doublePrecision, date } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, doublePrecision, date, varchar } from "drizzle-orm/pg-core";
 
 export const expenses = pgTable("expenses", {
   id: text("id").primaryKey(),
+  expenseId: varchar("expense_id", { length: 50 }),
   category: text("category").notNull().default("other"),
   amount: doublePrecision("amount").notNull(),
   description: text("title").notNull(),
