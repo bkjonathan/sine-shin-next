@@ -3,7 +3,6 @@ import { db } from "@/db";
 import { orders, customers, orderItems } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { GlassCard } from "@/components/ui/glass-card";
-import { GlassBadge } from "@/components/ui/glass-badge";
 import { PageHeader } from "@/components/layout/page-header";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { OrderItemsSection } from "@/components/orders/order-items-section";
@@ -45,7 +44,7 @@ export default async function OrderDetailPage({ params }: Props) {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/orders" className="text-white/40 hover:text-white/70 transition-colors">
+        <Link href="/orders" className="text-t3 transition-colors hover:text-t1">
           <ArrowLeft className="h-4 w-4" />
         </Link>
         <PageHeader
@@ -61,13 +60,13 @@ export default async function OrderDetailPage({ params }: Props) {
         <div className="lg:col-span-2 space-y-6">
           {/* Items */}
           <GlassCard>
-            <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Order Items</h3>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-t3">Order Items</h3>
             <OrderItemsSection orderId={id} items={items} />
           </GlassCard>
 
           {/* Fee breakdown */}
           <GlassCard>
-            <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Fee Breakdown</h3>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-t3">Fee Breakdown</h3>
             <dl className="space-y-2">
               {[
                 ["× Exchange Rate", order.exchangeRate.toFixed(4)],
@@ -77,13 +76,13 @@ export default async function OrderDetailPage({ params }: Props) {
                 ["Service Fee", formatCurrency(order.serviceFee)],
               ].map(([label, value]) => (
                 <div key={label} className="flex justify-between text-sm">
-                  <dt className="text-white/50">{label}</dt>
-                  <dd className="text-white/80 font-medium">{value}</dd>
+                  <dt className="text-t3">{label}</dt>
+                  <dd className="font-medium text-t1">{value}</dd>
                 </div>
               ))}
-              <div className="border-t border-white/10 pt-2 flex justify-between text-base font-semibold">
-                <dt className="text-white/80">Fees Total</dt>
-                <dd className="text-white/90">{formatCurrency(fees)}</dd>
+              <div className="flex justify-between border-t border-divide pt-2 text-base font-semibold">
+                <dt className="text-t1">Fees Total</dt>
+                <dd className="text-t1">{formatCurrency(fees)}</dd>
               </div>
             </dl>
           </GlassCard>
@@ -92,16 +91,16 @@ export default async function OrderDetailPage({ params }: Props) {
         {/* Sidebar */}
         <div className="space-y-4">
           <GlassCard>
-            <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Customer</h3>
+            <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-t3">Customer</h3>
             {customer ? (
               <div>
-                <Link href={`/customers/${customer.id}`} className="font-medium text-white/90 hover:text-[#007AFF] transition-colors">
+                <Link href={`/customers/${customer.id}`} className="font-medium text-t1 transition-colors hover:text-accent">
                   {customer.name}
                 </Link>
-                <p className="text-xs text-white/40 mt-0.5 font-mono">{customer.customerId}</p>
+                <p className="mt-0.5 font-mono text-xs text-t3">{customer.customerId}</p>
               </div>
             ) : (
-              <p className="text-sm text-white/40">No customer linked</p>
+              <p className="text-sm text-t3">No customer linked</p>
             )}
           </GlassCard>
 

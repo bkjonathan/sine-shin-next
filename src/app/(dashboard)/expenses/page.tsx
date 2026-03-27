@@ -12,7 +12,7 @@ import { GlassModal } from "@/components/ui/glass-modal";
 import { ExpenseForm } from "@/components/expenses/expense-form";
 import { useCreateExpense } from "@/hooks/use-expenses";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Receipt } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { CreateExpenseInput } from "@/validations/expense.schema";
 import { EXPENSE_CATEGORIES } from "@/validations/expense.schema";
 
@@ -45,26 +45,26 @@ export default function ExpensesPage() {
       />
 
       {/* Summary cards */}
-      <div className="grid grid-cols-2 gap-4 max-w-sm">
+      <div className="grid max-w-2xl gap-4 sm:grid-cols-2">
         <GlassCard padding="sm">
-          <p className="text-xs text-white/50 mb-1">Showing Total</p>
-          <p className="text-lg font-bold text-[#FF3B30]">{formatCurrency(totalShown)}</p>
+          <p className="mb-1 text-xs text-t3">Showing Total</p>
+          <p className="text-lg font-bold text-danger">{formatCurrency(totalShown)}</p>
         </GlassCard>
         <GlassCard padding="sm">
-          <p className="text-xs text-white/50 mb-1">Records</p>
-          <p className="text-lg font-bold text-white/90">{data?.meta?.total ?? 0}</p>
+          <p className="mb-1 text-xs text-t3">Records</p>
+          <p className="text-lg font-bold text-t1">{data?.meta?.total ?? 0}</p>
         </GlassCard>
       </div>
 
-      <div className="flex gap-3 flex-wrap">
-        <div className="w-72">
+      <div className="grid gap-3 rounded-[28px] border border-line bg-surface p-4 shadow-[var(--shadow-card)] md:grid-cols-[minmax(0,1fr)_12rem]">
+        <div className="min-w-0">
           <GlassInput
             placeholder="Search description..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
         </div>
-        <div className="w-44">
+        <div className="min-w-0">
           <GlassSelect
             options={categoryOptions}
             value={category}
@@ -79,7 +79,7 @@ export default function ExpensesPage() {
       {data?.meta && data.meta.totalPages > 1 && (
         <div className="flex items-center justify-center gap-3">
           <GlassButton variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</GlassButton>
-          <span className="text-sm text-white/50">Page {page} of {data.meta.totalPages}</span>
+          <span className="text-sm text-t2">Page {page} of {data.meta.totalPages}</span>
           <GlassButton variant="secondary" size="sm" disabled={page >= data.meta.totalPages} onClick={() => setPage(p => p + 1)}>Next</GlassButton>
         </div>
       )}

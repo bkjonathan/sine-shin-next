@@ -16,31 +16,32 @@ export function ThemeSelector() {
   const { mode, accent, setMode, setAccent } = useTheme();
 
   return (
-    <div className="flex items-center gap-3">
-      {/* Mode toggle */}
+    <div className="flex items-center gap-2 rounded-full border border-line bg-surface px-2 py-1.5 backdrop-blur-xl">
       <button
         onClick={() => setMode(mode === "dark" ? "light" : "dark")}
         className={cn(
-          "w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200",
-          "text-t2 hover:text-t1 hover:bg-surface"
+          "flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200",
+          "border-transparent text-t2 hover:border-line hover:bg-surface-hover hover:text-t1"
         )}
         title={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        aria-label={mode === "dark" ? "Switch to light mode" : "Switch to dark mode"}
       >
         {mode === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
       </button>
 
-      {/* Accent color dots */}
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5 pl-1">
         {ACCENTS.map((a) => (
           <button
             key={a.value}
             onClick={() => setAccent(a.value)}
             title={a.label}
+            aria-label={`${a.label} accent`}
+            aria-pressed={accent === a.value}
             className={cn(
-              "w-4 h-4 rounded-full transition-all duration-200",
+              "h-4 w-4 rounded-full border border-white/40 transition-all duration-200",
               accent === a.value
-                ? "scale-125 ring-2 ring-offset-1 ring-offset-transparent"
-                : "opacity-60 hover:opacity-100 hover:scale-110"
+                ? "scale-125 ring-2 ring-offset-2 ring-offset-transparent"
+                : "opacity-65 hover:opacity-100 hover:scale-110"
             )}
             style={{
               backgroundColor: a.color,

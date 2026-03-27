@@ -36,36 +36,36 @@ export function OrderItemsSection({ orderId, items }: OrderItemsSectionProps) {
   return (
     <div className="space-y-4">
       {items.length > 0 && (
-        <div className="rounded-xl border border-white/10 overflow-hidden">
+        <div className="overflow-hidden rounded-[24px] border border-line bg-surface shadow-[var(--shadow-sm)]">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/10 bg-white/[0.04]">
-                <th className="px-4 py-2.5 text-left text-xs font-semibold text-white/50 uppercase">Product URL</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold text-white/50 uppercase">Qty</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold text-white/50 uppercase">Price</th>
-                <th className="px-4 py-2.5 text-right text-xs font-semibold text-white/50 uppercase">Weight</th>
+              <tr className="border-b border-divide bg-topbar">
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.18em] text-t3">Product URL</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-[0.18em] text-t3">Qty</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-[0.18em] text-t3">Price</th>
+                <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-[0.18em] text-t3">Weight</th>
                 <th className="px-4 py-2.5 w-10" />
               </tr>
             </thead>
             <tbody>
               {items.map((item) => (
-                <tr key={item.id} className="border-b border-white/[0.05] last:border-0">
-                  <td className="px-4 py-3 text-white/80 max-w-xs truncate">
+                <tr key={item.id} className="border-b border-divide last:border-0">
+                  <td className="max-w-xs truncate px-4 py-3 text-t1">
                     {item.productUrl ? (
-                      <a href={item.productUrl} target="_blank" rel="noopener noreferrer" className="text-[#007AFF] hover:underline">
+                      <a href={item.productUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                         {item.productUrl}
                       </a>
                     ) : "—"}
                   </td>
-                  <td className="px-4 py-3 text-right text-white/60">{item.productQty ?? "—"}</td>
-                  <td className="px-4 py-3 text-right text-white/60">{item.price != null ? item.price.toFixed(2) : "—"}</td>
-                  <td className="px-4 py-3 text-right text-white/60">{item.productWeight != null ? `${item.productWeight} kg` : "—"}</td>
+                  <td className="px-4 py-3 text-right text-t2">{item.productQty ?? "—"}</td>
+                  <td className="px-4 py-3 text-right text-t2">{item.price != null ? item.price.toFixed(2) : "—"}</td>
+                  <td className="px-4 py-3 text-right text-t2">{item.productWeight != null ? `${item.productWeight} kg` : "—"}</td>
                   <td className="px-4 py-3">
                     <GlassButton
                       variant="ghost"
                       size="sm"
                       onClick={() => removeItem.mutate({ orderId, itemId: item.id })}
-                      className="hover:text-[#FF3B30]"
+                      className="hover:text-danger"
                       aria-label="Remove item"
                     >
                       <Trash2 className="h-3.5 w-3.5" />

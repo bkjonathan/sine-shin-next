@@ -12,7 +12,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { PageHeader } from "@/components/layout/page-header";
 
 export default function SettingsPage() {
-  const { data: settings, isLoading } = useSettings();
+  const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
   const changePassword = useChangePassword();
 
@@ -62,7 +62,7 @@ export default function SettingsPage() {
 
       {/* Shop info */}
       <GlassCard>
-        <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-5">Shop Information</h3>
+        <h3 className="mb-5 text-sm font-semibold uppercase tracking-[0.2em] text-t3">Shop Information</h3>
         <form onSubmit={handleSettings((d) => updateSettings.mutate(d))} className="space-y-4">
           <GlassInput label="Shop Name *" error={settingsErrors.shopName?.message} {...regSettings("shopName")} />
           <GlassInput label="Phone" {...regSettings("phone")} />
@@ -80,7 +80,7 @@ export default function SettingsPage() {
 
       {/* Change password */}
       <GlassCard>
-        <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-5">Change Password</h3>
+        <h3 className="mb-5 text-sm font-semibold uppercase tracking-[0.2em] text-t3">Change Password</h3>
         <form
           onSubmit={handlePassword((d) => changePassword.mutate(d, { onSuccess: () => resetPassword() }))}
           className="space-y-4"

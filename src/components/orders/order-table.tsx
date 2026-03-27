@@ -7,9 +7,9 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { OrderForm } from "./order-form";
 import { OrderStatusBadge } from "./order-status-badge";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { useCreateOrder, useDeleteOrder } from "@/hooks/use-orders";
-import { Pencil, Trash2, Eye } from "lucide-react";
+import { Trash2, Eye } from "lucide-react";
 import Link from "next/link";
 import type { CreateOrderInput } from "@/validations/order.schema";
 
@@ -41,14 +41,14 @@ export function OrderTable({ orders, isLoading }: OrderTableProps) {
       accessorKey: "orderId",
       header: "Order ID",
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-[#007AFF]">{row.original.orderId}</span>
+        <span className="font-mono text-xs text-accent">{row.original.orderId}</span>
       ),
     },
     {
       accessorKey: "customerName",
       header: "Customer",
       cell: ({ row }) => (
-        <span className="text-white/80">{row.original.customerName ?? "—"}</span>
+        <span className="text-t1">{row.original.customerName ?? "—"}</span>
       ),
     },
     {
@@ -75,7 +75,7 @@ export function OrderTable({ orders, isLoading }: OrderTableProps) {
             variant="ghost"
             size="sm"
             onClick={() => { if (confirm("Delete this order?")) deleteOrder.mutate(row.original.id); }}
-            className="hover:text-[#FF3B30]"
+            className="hover:text-danger"
             aria-label="Delete order"
           >
             <Trash2 className="h-3.5 w-3.5" />

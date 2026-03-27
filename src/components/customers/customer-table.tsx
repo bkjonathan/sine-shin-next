@@ -30,12 +30,12 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
       accessorKey: "customerId",
       header: "ID",
       cell: ({ row }) => (
-        <Link href={`/customers/${row.original.id}`} className="text-[#007AFF] hover:underline font-mono text-xs">
+        <Link href={`/customers/${row.original.id}`} className="font-mono text-xs text-accent hover:underline">
           {row.original.customerId}
         </Link>
       ),
     },
-    { accessorKey: "name", header: "Name", cell: ({ row }) => <span className="font-medium text-white/90">{row.original.name}</span> },
+    { accessorKey: "name", header: "Name", cell: ({ row }) => <span className="font-medium text-t1">{row.original.name}</span> },
     { accessorKey: "phone", header: "Phone", cell: ({ row }) => row.original.phone ?? "—" },
     { accessorKey: "createdAt", header: "Joined", cell: ({ row }) => formatDate(row.original.createdAt) },
     {
@@ -51,7 +51,7 @@ export function CustomerTable({ customers, isLoading }: CustomerTableProps) {
             size="sm"
             onClick={() => { if (confirm("Delete this customer?")) deleteCustomer.mutate(row.original.id); }}
             aria-label="Delete customer"
-            className="hover:text-[#FF3B30]"
+            className="hover:text-danger"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </GlassButton>

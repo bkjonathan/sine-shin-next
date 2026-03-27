@@ -37,15 +37,15 @@ export default function OrdersPage() {
         }
       />
 
-      <div className="flex gap-3 flex-wrap">
-        <div className="w-72">
+      <div className="grid gap-3 rounded-[28px] border border-line bg-surface p-4 shadow-[var(--shadow-card)] md:grid-cols-[minmax(0,1fr)_12rem]">
+        <div className="min-w-0">
           <GlassInput
             placeholder="Search by order ID..."
             value={search}
             onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           />
         </div>
-        <div className="w-44">
+        <div className="min-w-0">
           <GlassSelect
             options={statusOptions}
             value={status}
@@ -62,7 +62,7 @@ export default function OrdersPage() {
           <GlassButton variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
             Previous
           </GlassButton>
-          <span className="text-sm text-white/50">Page {page} of {data.meta.totalPages}</span>
+          <span className="text-sm text-t2">Page {page} of {data.meta.totalPages}</span>
           <GlassButton variant="secondary" size="sm" disabled={page >= data.meta.totalPages} onClick={() => setPage(p => p + 1)}>
             Next
           </GlassButton>

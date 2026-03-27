@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassButton } from "@/components/ui/glass-button";
-import { Store } from "lucide-react";
+import { BarChart3, ShieldCheck, Sparkles, Store } from "lucide-react";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -65,8 +65,8 @@ function LoginForm() {
       />
 
       {error && (
-        <div className="rounded-xl px-4 py-3 bg-[#FF3B30]/10 border border-[#FF3B30]/20">
-          <p className="text-sm text-[#FF3B30]">{error}</p>
+        <div className="rounded-2xl border border-[rgba(255,92,92,0.24)] bg-[rgba(255,92,92,0.12)] px-4 py-3">
+          <p className="text-sm text-danger">{error}</p>
         </div>
       )}
 
@@ -79,28 +79,69 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#0a0a0f]">
-      {/* Ambient background */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#007AFF]/10 rounded-full blur-[120px]" />
-        <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-purple-500/8 rounded-full blur-[100px]" />
+    <main className="relative min-h-screen overflow-hidden bg-page">
+      <div className="pointer-events-none absolute inset-0">
+        <div className="animate-float-slow absolute left-[8%] top-[12%] h-72 w-72 rounded-full blur-3xl" style={{ background: "var(--gradient-blob-1)" }} />
+        <div className="animate-float-reverse absolute bottom-[8%] right-[10%] h-80 w-80 rounded-full blur-3xl" style={{ background: "var(--gradient-blob-2)" }} />
       </div>
 
-      <div className="relative w-full max-w-sm px-4">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[#007AFF]/20 border border-[#007AFF]/30 mb-4 shadow-[0_0_32px_rgba(0,122,255,0.2)]">
-            <Store className="h-8 w-8 text-[#007AFF]" />
-          </div>
-          <h1 className="text-2xl font-bold text-white/90">Welcome back</h1>
-          <p className="text-sm text-white/50 mt-1">Sign in to your shop manager</p>
-        </div>
+      <div className="relative mx-auto flex min-h-screen w-full max-w-7xl items-center px-4 py-8 sm:px-6 lg:px-8">
+        <div className="grid w-full gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <section className="order-2 lg:order-1">
+            <div className="rounded-[32px] border border-line bg-surface p-6 shadow-[var(--shadow-card)] backdrop-blur-2xl sm:p-8">
+              <div className="inline-flex items-center gap-2 rounded-full border border-accent-border bg-accent-bg px-3 py-1.5 text-xs font-medium text-accent">
+                <Sparkles className="h-3.5 w-3.5" />
+                Shop operations cockpit
+              </div>
 
-        {/* Glass card */}
-        <div className="rounded-2xl border border-white/15 bg-white/[0.08] backdrop-blur-2xl shadow-[0_8px_32px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.2)] p-6">
-          <Suspense fallback={<div className="h-40 flex items-center justify-center text-white/40 text-sm">Loading…</div>}>
-            <LoginForm />
-          </Suspense>
+              <div className="mt-6 max-w-2xl">
+                <h1 className="text-4xl font-semibold tracking-tight text-t1 sm:text-5xl">
+                  A sharper control room for your store.
+                </h1>
+                <p className="mt-4 text-sm leading-7 text-t2 sm:text-base">
+                  Track customer growth, orders, expenses, and account health in a mobile-ready workspace with cleaner light mode and stronger visual hierarchy.
+                </p>
+              </div>
+
+              <div className="mt-8 grid gap-4 sm:grid-cols-3">
+                {[
+                  { icon: BarChart3, label: "Clear metrics", note: "Dashboards that stay readable in both themes." },
+                  { icon: ShieldCheck, label: "Secure access", note: "One sign-in flow for the whole operations team." },
+                  { icon: Store, label: "Built for mobile", note: "Responsive shell with drawer and bottom dock." },
+                ].map(({ icon: Icon, label, note }) => (
+                  <div key={label} className="rounded-[24px] border border-line bg-panel p-4">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-accent-border bg-accent-bg text-accent">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <p className="mt-4 text-sm font-semibold text-t1">{label}</p>
+                    <p className="mt-2 text-xs leading-6 text-t3">{note}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="order-1 w-full lg:order-2 lg:justify-self-end">
+            <div className="mx-auto w-full max-w-md rounded-[32px] border border-line bg-panel p-6 shadow-[var(--shadow-card-hover)] backdrop-blur-3xl sm:p-8">
+              <div className="text-center">
+                <div className="inline-flex h-16 w-16 items-center justify-center rounded-[24px] border border-accent-border bg-accent-bg shadow-[0_18px_40px_var(--accent-shadow)]">
+                  <Store className="h-8 w-8 text-accent" />
+                </div>
+                <h2 className="mt-5 text-3xl font-semibold tracking-tight text-t1">
+                  Welcome back
+                </h2>
+                <p className="mt-2 text-sm text-t2">
+                  Sign in to continue managing your shop.
+                </p>
+              </div>
+
+              <div className="mt-8">
+                <Suspense fallback={<div className="flex h-40 items-center justify-center text-sm text-t3">Loading...</div>}>
+                  <LoginForm />
+                </Suspense>
+              </div>
+            </div>
+          </section>
         </div>
       </div>
     </main>

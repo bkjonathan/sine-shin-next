@@ -20,30 +20,30 @@ const GlassButton = forwardRef<HTMLButtonElement, GlassButtonProps>(
         ref={ref}
         disabled={disabled || loading}
         className={cn(
-          "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-all duration-200",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border focus-visible:ring-offset-1",
+          "inline-flex items-center justify-center gap-2 rounded-2xl font-semibold transition-all duration-300",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border focus-visible:ring-offset-2 focus-visible:ring-offset-page",
           "disabled:opacity-50 disabled:cursor-not-allowed",
-          size === "sm" && "h-8 px-3 text-xs",
-          size === "md" && "h-10 px-4 text-sm",
+          size === "sm" && "h-9 px-3.5 text-xs",
+          size === "md" && "h-11 px-4.5 text-sm",
           size === "lg" && "h-12 px-6 text-base",
           variant === "primary" && [
             "bg-accent text-white",
-            "[box-shadow:0_4px_16px_var(--accent-shadow)]",
-            "hover:opacity-90 active:scale-95",
+            "[box-shadow:0_14px_30px_var(--accent-shadow)]",
+            "hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0",
           ],
           variant === "secondary" && [
             "bg-surface text-t1 border border-line",
             "backdrop-blur-xl",
-            "hover:bg-surface-hover hover:border-line-strong active:scale-95",
+            "hover:-translate-y-0.5 hover:bg-surface-hover hover:border-line-strong active:translate-y-0",
           ],
           variant === "ghost" && [
             "text-t2",
-            "hover:bg-surface hover:text-t1 active:scale-95",
+            "hover:bg-surface hover:text-t1 active:translate-y-0",
           ],
           variant === "danger" && [
             "bg-ios-red text-white",
-            "shadow-[0_4px_16px_rgba(255,59,48,0.3)]",
-            "hover:opacity-90 active:scale-95",
+            "shadow-[0_14px_30px_rgba(255,59,48,0.25)]",
+            "hover:-translate-y-0.5 hover:brightness-105 active:translate-y-0",
           ],
           className
         )}

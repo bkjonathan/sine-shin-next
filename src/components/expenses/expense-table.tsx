@@ -41,13 +41,13 @@ export function ExpenseTable({ expenses, isLoading }: ExpenseTableProps) {
     {
       accessorKey: "description",
       header: "Description",
-      cell: ({ row }) => <span className="text-white/70">{row.original.description}</span>,
+      cell: ({ row }) => <span className="text-t2">{row.original.description}</span>,
     },
     {
       accessorKey: "amount",
       header: "Amount",
       cell: ({ row }) => (
-        <span className="font-semibold text-[#FF3B30]">{formatCurrency(row.original.amount)}</span>
+        <span className="font-semibold text-danger">{formatCurrency(row.original.amount)}</span>
       ),
     },
     {
@@ -62,7 +62,7 @@ export function ExpenseTable({ expenses, isLoading }: ExpenseTableProps) {
             variant="ghost"
             size="sm"
             onClick={() => { if (confirm("Delete this expense?")) deleteExpense.mutate(row.original.id); }}
-            className="hover:text-[#FF3B30]"
+            className="hover:text-danger"
             aria-label="Delete"
           >
             <Trash2 className="h-3.5 w-3.5" />

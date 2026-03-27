@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
 import { customers, orders } from "@/db/schema";
-import { eq, isNull, and, sql } from "drizzle-orm";
+import { eq, isNull, and } from "drizzle-orm";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { CustomerStats } from "@/components/customers/customer-stats";
@@ -46,7 +46,7 @@ export default async function CustomerDetailPage({ params }: Props) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Profile */}
         <GlassCard>
-          <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider mb-4">Profile</h3>
+          <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.2em] text-t3">Profile</h3>
           <dl className="space-y-3">
             {[
               ["ID", customer.customerId],
@@ -57,8 +57,8 @@ export default async function CustomerDetailPage({ params }: Props) {
               ["Address", customer.address ?? "—"],
             ].map(([label, value]) => (
               <div key={label} className="flex gap-4">
-                <dt className="w-24 shrink-0 text-xs text-white/40 pt-0.5">{label}</dt>
-                <dd className="text-sm text-white/80 break-words">{value}</dd>
+                <dt className="w-24 shrink-0 pt-0.5 text-xs text-t3">{label}</dt>
+                <dd className="break-words text-sm text-t1">{value}</dd>
               </div>
             ))}
           </dl>
@@ -66,26 +66,26 @@ export default async function CustomerDetailPage({ params }: Props) {
 
         {/* Orders */}
         <GlassCard padding="none">
-          <div className="px-6 py-4 border-b border-white/10">
-            <h3 className="text-sm font-semibold text-white/60 uppercase tracking-wider">Order History</h3>
+          <div className="border-b border-divide px-6 py-4">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-t3">Order History</h3>
           </div>
-          <div className="divide-y divide-white/[0.06]">
+          <div className="divide-y divide-divide">
             {customerOrders.length === 0 ? (
-              <p className="px-6 py-8 text-center text-sm text-white/40">No orders yet</p>
+              <p className="px-6 py-8 text-center text-sm text-t3">No orders yet</p>
             ) : (
               customerOrders.map((order) => (
                 <Link
                   key={order.id}
                   href={`/orders/${order.id}`}
-                  className="flex items-center justify-between px-6 py-3.5 hover:bg-white/[0.04] transition-colors"
+                  className="flex items-center justify-between px-6 py-3.5 transition-colors hover:bg-surface-hover"
                 >
                   <div>
-                    <p className="text-sm font-medium text-white/80">{order.orderId}</p>
-                    <p className="text-xs text-white/40">{formatDate(order.createdAt)}</p>
+                    <p className="text-sm font-medium text-t1">{order.orderId}</p>
+                    <p className="text-xs text-t3">{formatDate(order.createdAt)}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <OrderStatusBadge status={order.status} />
-                    <span className="text-sm font-semibold text-white/80">{formatCurrency(order.shippingFee + order.deliveryFee + order.cargoFee + order.serviceFee)}</span>
+                    <span className="text-sm font-semibold text-t1">{formatCurrency(order.shippingFee + order.deliveryFee + order.cargoFee + order.serviceFee)}</span>
                   </div>
                 </Link>
               ))

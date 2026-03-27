@@ -46,9 +46,9 @@ export function CustomerForm({ defaultValues, onSubmit, isLoading, onCancel }: C
           {...register("phone")}
         />
         <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-medium text-white/60">Platform</label>
+          <label className="text-xs font-medium text-t3">Platform</label>
           <select
-            className="w-full rounded-xl border border-white/15 bg-white/[0.06] px-3 py-2.5 text-sm text-white/80 focus:outline-none focus:border-[#007AFF]/50 focus:bg-white/[0.08]"
+            className="w-full rounded-2xl border border-line bg-field px-3 py-3 text-sm text-t1 outline-none transition-all duration-200 focus:border-accent-border focus:bg-[var(--bg-panel)]"
             {...register("platform", {
               onChange: (e) => {
                 const prefixes: Record<string, string> = {
@@ -67,10 +67,10 @@ export function CustomerForm({ defaultValues, onSubmit, isLoading, onCancel }: C
           >
             <option value="">Select Platform</option>
             {PLATFORMS.map((p) => (
-              <option key={p} value={p} className="bg-[#1a1a2e] text-white">{p}</option>
+              <option key={p} value={p}>{p}</option>
             ))}
           </select>
-          {errors.platform && <p className="text-xs text-[#FF3B30]">{errors.platform.message}</p>}
+          {errors.platform && <p className="text-xs text-danger">{errors.platform.message}</p>}
         </div>
       </div>
       <div className="grid grid-cols-2 gap-4">

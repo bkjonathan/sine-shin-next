@@ -10,18 +10,18 @@ interface CustomerStatsProps {
 
 export function CustomerStats({ customer, orderCount, totalSpent }: CustomerStatsProps) {
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid gap-4 sm:grid-cols-3">
       <GlassCard padding="sm">
-        <p className="text-xs text-white/50">Total Orders</p>
-        <p className="text-xl font-bold text-white/90 mt-1">{orderCount}</p>
+        <p className="text-xs text-t3">Total Orders</p>
+        <p className="mt-1 text-xl font-bold text-t1">{orderCount}</p>
       </GlassCard>
       <GlassCard padding="sm">
-        <p className="text-xs text-white/50">Total Spent</p>
-        <p className="text-xl font-bold text-white/90 mt-1">${totalSpent.toFixed(2)}</p>
+        <p className="text-xs text-t3">Total Spent</p>
+        <p className="mt-1 text-xl font-bold text-t1">${totalSpent.toFixed(2)}</p>
       </GlassCard>
       <GlassCard padding="sm">
-        <p className="text-xs text-white/50">Member Since</p>
-        <p className="text-sm font-bold text-white/90 mt-1">{formatDate(customer.createdAt)}</p>
+        <p className="text-xs text-t3">Member Since</p>
+        <p className="mt-1 text-sm font-bold text-t1">{formatDate(customer.createdAt)}</p>
       </GlassCard>
     </div>
   );

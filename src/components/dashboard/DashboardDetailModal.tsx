@@ -32,46 +32,46 @@ export function DashboardDetailModal({
     <GlassModal open={open} onOpenChange={onOpenChange} title={title} size="lg">
       <div className="mt-2">
         {records.length === 0 ? (
-          <p className="text-center py-8 text-sm text-white/50">No records for this metric.</p>
+          <p className="py-8 text-center text-sm text-t3">No records for this metric.</p>
         ) : (
           <>
-            <div className="overflow-x-auto rounded-xl border border-white/10">
+            <div className="overflow-x-auto rounded-[24px] border border-line bg-surface">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/10 text-left">
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-white/40">Order ID</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-white/40">Customer</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-white/40 text-right">Amount</th>
-                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-white/40">Date</th>
+                  <tr className="border-b border-divide text-left">
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-t3">Order ID</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-t3">Customer</th>
+                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-[0.18em] text-t3">Amount</th>
+                    <th className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-t3">Date</th>
                   </tr>
                 </thead>
                 <tbody>
                   {records.map((r, i) => (
                     <tr
                       key={i}
-                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                      className="border-b border-divide transition-colors hover:bg-surface-hover"
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-white/70">
+                      <td className="px-4 py-3 font-mono text-xs text-t2">
                         {r.order_id ?? "—"}
                       </td>
-                      <td className="px-4 py-3 text-white/80">
+                      <td className="px-4 py-3 text-t1">
                         {r.customer_name ?? "—"}
                       </td>
-                      <td className="px-4 py-3 text-right font-semibold text-white/90">
+                      <td className="px-4 py-3 text-right font-semibold text-t1">
                         {formatCurrency(r.amount)}
                       </td>
-                      <td className="px-4 py-3 text-white/50 text-xs">
+                      <td className="px-4 py-3 text-xs text-t3">
                         {r.order_date ? formatDate(r.order_date, "d MMM yyyy") : "—"}
                       </td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr className="border-t border-white/20 bg-white/5">
-                    <td colSpan={2} className="px-4 py-3 text-xs font-semibold uppercase tracking-widest text-white/40">
+                  <tr className="border-t border-divide bg-topbar">
+                    <td colSpan={2} className="px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-t3">
                       Total ({records.length} orders)
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-white">
+                    <td className="px-4 py-3 text-right font-bold text-t1">
                       {formatCurrency(total)}
                     </td>
                     <td />

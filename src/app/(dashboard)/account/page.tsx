@@ -63,23 +63,23 @@ export default function AccountPage() {
       {/* ── Net Balance Hero ── */}
       <GlassCard className={cn(
         "flex flex-col gap-2 border-2",
-        netPositive ? "border-[#30D158]/30 bg-[#30D158]/5" : "border-[#FF3B30]/30 bg-[#FF3B30]/5"
+        netPositive ? "border-[rgba(49,201,126,0.28)] bg-[rgba(49,201,126,0.08)]" : "border-[rgba(255,92,92,0.28)] bg-[rgba(255,92,92,0.08)]"
       )}>
         <div className="flex items-center gap-3">
           <div className={cn(
             "w-12 h-12 rounded-2xl flex items-center justify-center",
-            netPositive ? "bg-[#30D158]/20" : "bg-[#FF3B30]/20"
+            netPositive ? "bg-[rgba(49,201,126,0.18)]" : "bg-[rgba(255,92,92,0.18)]"
           )}>
             {netPositive
-              ? <ArrowUpRight className="h-6 w-6 text-[#30D158]" />
-              : <ArrowDownRight className="h-6 w-6 text-[#FF3B30]" />
+              ? <ArrowUpRight className="h-6 w-6 text-success" />
+              : <ArrowDownRight className="h-6 w-6 text-danger" />
             }
           </div>
           <div>
             <p className="text-xs font-semibold tracking-widest text-t3 uppercase">Net Balance</p>
             <p className={cn(
               "text-3xl font-bold mt-0.5",
-              netPositive ? "text-[#30D158]" : "text-[#FF3B30]"
+              netPositive ? "text-success" : "text-danger"
             )}>
               {isLoading ? "—" : formatCurrency(netBalance)}
             </p>
@@ -120,38 +120,38 @@ export default function AccountPage() {
               label="Total Income (all time)"
               value={v(summary?.total_income)}
               icon={TrendingUp}
-              iconColor="text-[#30D158]"
+              iconColor="text-success"
               bold
             />
             <SummaryRow
               label="This Month"
               value={v(summary?.this_month_income)}
               icon={BarChart2}
-              iconColor="text-[#007AFF]"
+              iconColor="text-accent"
             />
             <SummaryRow
               label="Service Fees"
               value={v(summary?.total_service_fee)}
               icon={Percent}
-              iconColor="text-[#AF52DE]"
+              iconColor="text-info"
             />
             <SummaryRow
               label="Product Discounts"
               value={v(summary?.total_product_discount)}
               icon={Tag}
-              iconColor="text-[#FF9F0A]"
+              iconColor="text-warning"
             />
             <SummaryRow
               label="Cargo Fees (effective)"
               value={v(summary?.total_cargo_fee)}
               icon={Package}
-              iconColor="text-[#FF9F0A]"
+              iconColor="text-warning"
             />
             <SummaryRow
               label="Total Orders"
               value={isLoading ? "—" : String(summary?.total_orders ?? 0)}
               icon={ShoppingCart}
-              iconColor="text-[#007AFF]"
+              iconColor="text-accent"
             />
           </GlassCard>
 
@@ -163,20 +163,20 @@ export default function AccountPage() {
               label="Total Expenses (all time)"
               value={v(summary?.total_expenses)}
               icon={TrendingDown}
-              iconColor="text-[#FF3B30]"
+              iconColor="text-danger"
               bold
             />
             <SummaryRow
               label="This Month"
               value={v(summary?.this_month_expenses)}
               icon={BarChart2}
-              iconColor="text-[#007AFF]"
+              iconColor="text-accent"
             />
             <SummaryRow
               label="Expense Records"
               value={isLoading ? "—" : String(summary?.total_expense_records ?? 0)}
               icon={Receipt}
-              iconColor="text-[#FF9F0A]"
+              iconColor="text-warning"
             />
           </GlassCard>
 
@@ -185,9 +185,9 @@ export default function AccountPage() {
             <h3 className="text-sm font-semibold text-t1 mb-4">Balance Breakdown</h3>
             <div className="grid grid-cols-3 gap-4">
               {[
-                { label: "Total Income",   value: v(summary?.total_income),   color: "text-[#30D158]", icon: TrendingUp   },
-                { label: "Total Expenses", value: v(summary?.total_expenses),  color: "text-[#FF3B30]", icon: TrendingDown },
-                { label: "Net Balance",    value: isLoading ? "—" : formatCurrency(netBalance), color: netPositive ? "text-[#30D158]" : "text-[#FF3B30]", icon: DollarSign },
+                { label: "Total Income",   value: v(summary?.total_income),   color: "text-success", icon: TrendingUp   },
+                { label: "Total Expenses", value: v(summary?.total_expenses),  color: "text-danger", icon: TrendingDown },
+                { label: "Net Balance",    value: isLoading ? "—" : formatCurrency(netBalance), color: netPositive ? "text-success" : "text-danger", icon: DollarSign },
               ].map(({ label, value, color, icon: Icon }) => (
                 <div key={label} className="text-center p-4 rounded-xl bg-surface border border-line">
                   <Icon className={cn("h-5 w-5 mx-auto mb-2", color)} />
@@ -204,12 +204,12 @@ export default function AccountPage() {
         <GlassCard>
           <h3 className="text-sm font-semibold text-t1 mb-1">Income Details</h3>
           <p className="text-xs text-t3 mb-6">Breakdown of all income sources</p>
-          <SummaryRow label="Total Income" value={v(summary?.total_income)} icon={TrendingUp} iconColor="text-[#30D158]" bold />
-          <SummaryRow label="This Month" value={v(summary?.this_month_income)} icon={BarChart2} iconColor="text-[#007AFF]" />
-          <SummaryRow label="Service Fees Collected" value={v(summary?.total_service_fee)} icon={Percent} iconColor="text-[#AF52DE]" />
-          <SummaryRow label="Product Discounts Applied" value={v(summary?.total_product_discount)} icon={Tag} iconColor="text-[#FF9F0A]" />
-          <SummaryRow label="Effective Cargo Fees" value={v(summary?.total_cargo_fee)} icon={Package} iconColor="text-[#FF9F0A]" />
-          <SummaryRow label="Orders Processed" value={isLoading ? "—" : String(summary?.total_orders ?? 0)} icon={ShoppingCart} iconColor="text-[#007AFF]" />
+          <SummaryRow label="Total Income" value={v(summary?.total_income)} icon={TrendingUp} iconColor="text-success" bold />
+          <SummaryRow label="This Month" value={v(summary?.this_month_income)} icon={BarChart2} iconColor="text-accent" />
+          <SummaryRow label="Service Fees Collected" value={v(summary?.total_service_fee)} icon={Percent} iconColor="text-info" />
+          <SummaryRow label="Product Discounts Applied" value={v(summary?.total_product_discount)} icon={Tag} iconColor="text-warning" />
+          <SummaryRow label="Effective Cargo Fees" value={v(summary?.total_cargo_fee)} icon={Package} iconColor="text-warning" />
+          <SummaryRow label="Orders Processed" value={isLoading ? "—" : String(summary?.total_orders ?? 0)} icon={ShoppingCart} iconColor="text-accent" />
         </GlassCard>
       )}
 
@@ -217,9 +217,9 @@ export default function AccountPage() {
         <GlassCard>
           <h3 className="text-sm font-semibold text-t1 mb-1">Expense Details</h3>
           <p className="text-xs text-t3 mb-6">Breakdown of all business expenses</p>
-          <SummaryRow label="Total Expenses" value={v(summary?.total_expenses)} icon={TrendingDown} iconColor="text-[#FF3B30]" bold />
-          <SummaryRow label="This Month" value={v(summary?.this_month_expenses)} icon={BarChart2} iconColor="text-[#007AFF]" />
-          <SummaryRow label="Total Expense Records" value={isLoading ? "—" : String(summary?.total_expense_records ?? 0)} icon={Receipt} iconColor="text-[#FF9F0A]" />
+          <SummaryRow label="Total Expenses" value={v(summary?.total_expenses)} icon={TrendingDown} iconColor="text-danger" bold />
+          <SummaryRow label="This Month" value={v(summary?.this_month_expenses)} icon={BarChart2} iconColor="text-accent" />
+          <SummaryRow label="Total Expense Records" value={isLoading ? "—" : String(summary?.total_expense_records ?? 0)} icon={Receipt} iconColor="text-warning" />
         </GlassCard>
       )}
     </div>

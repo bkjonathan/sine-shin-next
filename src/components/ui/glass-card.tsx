@@ -12,10 +12,11 @@ const GlassCard = forwardRef<HTMLDivElement, GlassCardProps>(
       <div
         ref={ref}
         className={cn(
-          "rounded-2xl border transition-all duration-200",
-          "bg-surface backdrop-blur-2xl border-line",
+          "relative isolate overflow-hidden rounded-[28px] border border-line bg-surface backdrop-blur-2xl",
+          "before:pointer-events-none before:absolute before:inset-x-6 before:top-0 before:h-px before:bg-white/60 before:opacity-50",
+          "transition-[transform,background-color,border-color,box-shadow] duration-300",
           "[box-shadow:var(--shadow-card)]",
-          hover && "hover:bg-surface-hover hover:border-line-strong",
+          hover && "hover:-translate-y-1 hover:bg-surface-hover hover:border-line-strong hover:[box-shadow:var(--shadow-card-hover)]",
           padding === "sm" && "p-4",
           padding === "md" && "p-6",
           padding === "lg" && "p-8",

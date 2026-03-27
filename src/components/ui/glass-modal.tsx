@@ -26,15 +26,15 @@ export function GlassModal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
+        <Dialog.Overlay className="fixed inset-0 z-50 bg-[color:var(--bg-overlay)] backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0" />
         <Dialog.Content
           className={cn(
             "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
-            "w-full rounded-2xl",
-            "bg-[rgba(15,15,20,0.85)] backdrop-blur-3xl",
-            "border border-white/15",
-            "shadow-[0_24px_64px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.1)]",
-            "p-6",
+            "w-[calc(100vw-1.5rem)] max-h-[85vh] overflow-y-auto rounded-[28px]",
+            "bg-panel backdrop-blur-3xl",
+            "border border-line",
+            "shadow-[var(--shadow-card-hover)]",
+            "p-5 sm:p-6",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -50,17 +50,17 @@ export function GlassModal({
           <div className="flex items-start justify-between mb-4">
             <div>
               {title && (
-                <Dialog.Title className="text-lg font-semibold text-white/90">
+                <Dialog.Title className="text-lg font-semibold text-t1">
                   {title}
                 </Dialog.Title>
               )}
               {description && (
-                <Dialog.Description className="mt-1 text-sm text-white/50">
+                <Dialog.Description className="mt-1 text-sm text-t2">
                   {description}
                 </Dialog.Description>
               )}
             </div>
-            <Dialog.Close className="rounded-lg p-1.5 text-white/40 hover:text-white/80 hover:bg-white/10 transition-colors">
+            <Dialog.Close className="rounded-xl p-2 text-t3 transition-colors hover:bg-surface hover:text-t1">
               <X className="h-4 w-4" />
             </Dialog.Close>
           </div>

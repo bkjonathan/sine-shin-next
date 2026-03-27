@@ -6,7 +6,7 @@ import { Search, LayoutDashboard, Users, ShoppingCart, Receipt, Settings } from 
 import { useRouter } from "next/navigation";
 
 const COMMANDS = [
-  { id: "dashboard", label: "Go to Dashboard", icon: LayoutDashboard, href: "/" },
+  { id: "dashboard", label: "Go to Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { id: "customers", label: "Go to Customers", icon: Users, href: "/customers" },
   { id: "orders", label: "Go to Orders", icon: ShoppingCart, href: "/orders" },
   { id: "expenses", label: "Go to Expenses", icon: Receipt, href: "/expenses" },
@@ -37,48 +37,46 @@ export function CommandPalette() {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm text-white/40 bg-white/[0.06] border border-white/10 hover:border-white/20 hover:text-white/60 transition-all"
+        className="flex w-full items-center gap-2 rounded-2xl border border-line bg-surface px-3 py-2 text-sm text-t3 transition-all hover:border-line-strong hover:bg-surface-hover hover:text-t1 md:w-auto"
         aria-label="Open command palette"
       >
         <Search className="h-3.5 w-3.5" />
-        <span className="hidden sm:block">Search...</span>
-        <kbd className="hidden sm:block text-xs px-1.5 py-0.5 rounded bg-white/10 font-mono">⌘K</kbd>
+        <span className="hidden sm:block">Search anything...</span>
+        <kbd className="hidden rounded-lg border border-line bg-panel px-1.5 py-0.5 font-mono text-xs text-t3 sm:block">⌘K</kbd>
       </button>
 
       {open && (
         <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[20vh]">
-          {/* Backdrop */}
           <div
-            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-[color:var(--bg-overlay)] backdrop-blur-sm"
             onClick={() => setOpen(false)}
           />
 
-          {/* Palette */}
           <Command
-            className="relative w-full max-w-lg rounded-2xl bg-[rgba(15,15,20,0.95)] backdrop-blur-3xl border border-white/15 shadow-[0_32px_80px_rgba(0,0,0,0.6)] overflow-hidden"
+            className="relative w-[calc(100vw-1.5rem)] max-w-xl overflow-hidden rounded-[28px] border border-line bg-panel shadow-[var(--shadow-card-hover)] backdrop-blur-3xl"
             label="Command palette"
           >
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-white/10">
-              <Search className="h-4 w-4 text-white/40 shrink-0" />
+            <div className="flex items-center gap-3 border-b border-divide px-4 py-3">
+              <Search className="h-4 w-4 shrink-0 text-t3" />
               <Command.Input
                 placeholder="Type a command..."
-                className="flex-1 bg-transparent text-sm text-white/90 placeholder:text-white/30 outline-none"
+                className="flex-1 bg-transparent text-sm text-t1 placeholder:text-t4 outline-none"
               />
-              <kbd className="text-xs px-1.5 py-0.5 rounded bg-white/10 text-white/40 font-mono">ESC</kbd>
+              <kbd className="rounded-lg border border-line bg-surface px-1.5 py-0.5 font-mono text-xs text-t3">ESC</kbd>
             </div>
 
             <Command.List className="p-2 max-h-72 overflow-y-auto">
-              <Command.Empty className="py-8 text-center text-sm text-white/40">
+              <Command.Empty className="py-8 text-center text-sm text-t3">
                 No commands found
               </Command.Empty>
 
-              <Command.Group heading={<span className="px-2 py-1 text-xs font-semibold text-white/30 uppercase tracking-wider">Navigation</span>}>
+              <Command.Group heading={<span className="px-2 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-t4">Navigation</span>}>
                 {COMMANDS.map(({ id, label, icon: Icon, href }) => (
                   <Command.Item
                     key={id}
                     value={label}
                     onSelect={() => runCommand(href)}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-white/70 cursor-pointer data-[selected=true]:bg-white/10 data-[selected=true]:text-white outline-none transition-colors"
+                    className="flex cursor-pointer items-center gap-3 rounded-2xl px-3 py-2.5 text-sm text-t2 outline-none transition-colors data-[selected=true]:bg-surface-hover data-[selected=true]:text-t1"
                   >
                     <Icon className="h-4 w-4 shrink-0" />
                     {label}

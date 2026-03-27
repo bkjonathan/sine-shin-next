@@ -9,7 +9,7 @@ import { GlassInput } from "@/components/ui/glass-input";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { CustomerForm } from "@/components/customers/customer-form";
 import { useCreateCustomer } from "@/hooks/use-customers";
-import { Plus, Search } from "lucide-react";
+import { Plus } from "lucide-react";
 import type { CreateCustomerInput } from "@/validations/customer.schema";
 
 export default function CustomersPage() {
@@ -33,7 +33,7 @@ export default function CustomersPage() {
       />
 
       {/* Search */}
-      <div className="max-w-sm">
+      <div className="max-w-lg rounded-[28px] border border-line bg-surface p-4 shadow-[var(--shadow-card)]">
         <GlassInput
           placeholder="Search by name, ID, or phone..."
           value={search}
@@ -49,7 +49,7 @@ export default function CustomersPage() {
           <GlassButton variant="secondary" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>
             Previous
           </GlassButton>
-          <span className="text-sm text-white/50">Page {page} of {data.meta.totalPages}</span>
+          <span className="text-sm text-t2">Page {page} of {data.meta.totalPages}</span>
           <GlassButton variant="secondary" size="sm" disabled={page >= data.meta.totalPages} onClick={() => setPage(p => p + 1)}>
             Next
           </GlassButton>

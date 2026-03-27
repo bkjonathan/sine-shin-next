@@ -32,25 +32,16 @@ function getStoredTheme(): { mode: ThemeMode; accent: ThemeAccent } {
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [mode, setModeState] = useState<ThemeMode>("dark");
-  const [accent, setAccentState] = useState<ThemeAccent>("blue");
-  const [mounted, setMounted] = useState(false);
+  const [mode, setModeState] = useState<ThemeMode>(() => getStoredTheme().mode);
+  const [accent, setAccentState] = useState<ThemeAccent>(() => getStoredTheme().accent);
 
   useEffect(() => {
-    const { mode: storedMode, accent: storedAccent } = getStoredTheme();
-    setModeState(storedMode);
-    setAccentState(storedAccent);
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    if (!mounted) return;
     const el = document.documentElement;
     el.setAttribute("data-theme", mode);
     el.setAttribute("data-accent", accent);
     localStorage.setItem("theme-mode", mode);
     localStorage.setItem("theme-accent", accent);
-  }, [mode, accent, mounted]);
+  }, [mode, accent]);
 
   function setMode(m: ThemeMode) {
     setModeState(m);
