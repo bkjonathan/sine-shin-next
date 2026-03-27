@@ -15,11 +15,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <Providers session={session}>
-      <div className="min-h-screen flex bg-[#0a0a0f]">
-        {/* Background gradients */}
-        <div className="fixed inset-0 pointer-events-none">
-          <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-[#007AFF]/6 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-3xl" />
+      <div className="min-h-screen flex bg-page transition-colors duration-300">
+        {/* Background gradient blobs */}
+        <div className="fixed inset-0 pointer-events-none overflow-hidden">
+          <div
+            className="absolute top-0 right-1/4 w-[500px] h-[500px] rounded-full blur-3xl"
+            style={{ background: "var(--gradient-blob-1)" }}
+          />
+          <div
+            className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] rounded-full blur-3xl"
+            style={{ background: "var(--gradient-blob-2)" }}
+          />
         </div>
 
         <Sidebar settings={settings} />

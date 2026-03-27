@@ -21,31 +21,29 @@ const GlassButton = forwardRef<HTMLButtonElement, GlassButtonProps>(
         disabled={disabled || loading}
         className={cn(
           "inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-all duration-200",
-          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-1",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-border focus-visible:ring-offset-1",
           "disabled:opacity-50 disabled:cursor-not-allowed",
-          // sizes
           size === "sm" && "h-8 px-3 text-xs",
           size === "md" && "h-10 px-4 text-sm",
           size === "lg" && "h-12 px-6 text-base",
-          // variants
           variant === "primary" && [
-            "bg-[#007AFF] text-white",
-            "shadow-[0_4px_16px_rgba(0,122,255,0.3)]",
-            "hover:bg-[#0066d6] active:scale-95",
+            "bg-accent text-white",
+            "[box-shadow:0_4px_16px_var(--accent-shadow)]",
+            "hover:opacity-90 active:scale-95",
           ],
           variant === "secondary" && [
-            "bg-white/[0.12] text-white/90 border border-white/15",
+            "bg-surface text-t1 border border-line",
             "backdrop-blur-xl",
-            "hover:bg-white/[0.18] hover:border-white/25 active:scale-95",
+            "hover:bg-surface-hover hover:border-line-strong active:scale-95",
           ],
           variant === "ghost" && [
-            "text-white/70",
-            "hover:bg-white/[0.08] hover:text-white/90 active:scale-95",
+            "text-t2",
+            "hover:bg-surface hover:text-t1 active:scale-95",
           ],
           variant === "danger" && [
-            "bg-[#FF3B30] text-white",
+            "bg-ios-red text-white",
             "shadow-[0_4px_16px_rgba(255,59,48,0.3)]",
-            "hover:bg-[#e0352a] active:scale-95",
+            "hover:opacity-90 active:scale-95",
           ],
           className
         )}

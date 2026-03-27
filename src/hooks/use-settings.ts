@@ -49,26 +49,51 @@ export function useChangePassword() {
   });
 }
 
-export function useDashboardStats() {
+export interface DashboardFilters {
+  dateFrom?: string;
+  dateTo?: string;
+  dateField?: string;
+  status?: string;
+}
+
+export interface DashboardData {
+  financial: {
+    totalRevenue: number;
+    netRevenue: number;
+    totalProfit: number;
+    avgOrderValue: number;
+  };
+  operations: {
+    totalOrders: number;
+    totalCustomers: number;
+    totalCargoFee: number;
+    paidCargoFee: number;
+    unpaidCargoFee: number;
+    excludedCargoFee: number;
+    cargoCollectionRate: number;
+  };
+  recentActivity: Array<{
+    id: string;
+    orderId: string;
+    status: string;
+    total: number;
+    createdAt: string;
+    customerName: string | null;
+    customerDisplayId: string | null;
+  }>;
+}
+
+export function useDashboardStats(filters: DashboardFilters = {}) {
   return useQuery({
-    queryKey: ["dashboard"],
+    queryKey: ["dashboard", filters],
     queryFn: async () => {
-      const { data } = await api.get<ApiSuccess<{
-        stats: {
-          totalCustomers: number;
-          activeOrders: number;
-          monthlyRevenue: number;
-          totalExpenses: number;
-        };
-        recentOrders: Array<{
-          id: string;
-          orderId: string;
-          status: string;
-          total: number;
-          createdAt: string;
-          customerId: string | null;
-        }>;
-      }>>("/dashboard");
+      const params = new URLSearchParams();
+      if (filters.dateFrom)  params.set("dateFrom",  filters.dateFrom);
+      if (filters.dateTo)    params.set("dateTo",    filters.dateTo);
+      if (filters.dateField) params.set("dateField", filters.dateField);
+      if (filters.status)    params.set("status",    filters.status);
+      const qs = params.toString();
+      const { data } = await api.get<ApiSuccess<DashboardData>>(`/dashboard${qs ? `?${qs}` : ""}`);
       return data.data;
     },
   });

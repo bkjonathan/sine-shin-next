@@ -17,6 +17,18 @@ export const metadata: Metadata = {
   description: "Internal shop management system",
 };
 
+// Inline script applied before first paint to avoid theme flash
+const themeScript = `
+(function(){
+  try {
+    var mode = localStorage.getItem('theme-mode') || 'dark';
+    var accent = localStorage.getItem('theme-accent') || 'blue';
+    document.documentElement.setAttribute('data-theme', mode);
+    document.documentElement.setAttribute('data-accent', accent);
+  } catch(e) {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -25,9 +37,15 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-theme="dark"
+      data-accent="blue"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-[#0a0a0f]">{children}</body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body className="min-h-full bg-page">{children}</body>
     </html>
   );
 }

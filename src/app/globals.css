@@ -6,20 +6,134 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Glass palette */
-  --color-glass-bg: rgba(255, 255, 255, 0.08);
-  --color-glass-border: rgba(255, 255, 255, 0.15);
-  --color-ios-blue: #007AFF;
+  /* Semantic theme tokens — mapped from CSS vars set by data-theme / data-accent */
+  --color-page: var(--bg-page);
+  --color-surface: var(--bg-surface);
+  --color-surface-hover: var(--bg-surface-hover);
+  --color-sidebar: var(--bg-sidebar);
+  --color-topbar: var(--bg-topbar);
+
+  --color-t1: var(--text-1);
+  --color-t2: var(--text-2);
+  --color-t3: var(--text-3);
+  --color-t4: var(--text-4);
+
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-divide: var(--divide-color);
+
+  --color-accent: var(--accent);
+  --color-accent-bg: var(--accent-bg);
+  --color-accent-border: var(--accent-border);
+
+  /* Status colors (fixed) */
   --color-ios-green: #34C759;
   --color-ios-red: #FF3B30;
   --color-ios-amber: #FF9F0A;
+  --color-ios-purple: #AF52DE;
 }
 
-:root {
+/* ─── DARK THEME (default) ─────────────────────────────────────── */
+:root,
+[data-theme="dark"] {
   --background: #0a0a0f;
   --foreground: rgba(255, 255, 255, 0.9);
+
+  --bg-page: #0a0a0f;
+  --bg-surface: rgba(255, 255, 255, 0.07);
+  --bg-surface-hover: rgba(255, 255, 255, 0.11);
+  --bg-sidebar: rgba(255, 255, 255, 0.05);
+  --bg-topbar: rgba(255, 255, 255, 0.04);
+
+  --text-1: rgba(255, 255, 255, 0.90);
+  --text-2: rgba(255, 255, 255, 0.60);
+  --text-3: rgba(255, 255, 255, 0.40);
+  --text-4: rgba(255, 255, 255, 0.22);
+
+  --border: rgba(255, 255, 255, 0.10);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --divide-color: rgba(255, 255, 255, 0.06);
+
+  --shadow-card: 0 8px 32px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.07);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,0.24);
+  --scrollbar-color: rgba(255,255,255,0.14);
+  --scrollbar-hover: rgba(255,255,255,0.24);
+  --gradient-blob-1: rgba(0,122,255,0.06);
+  --gradient-blob-2: rgba(168,85,247,0.05);
+  --date-input-filter: invert(0.6);
 }
 
+/* ─── LIGHT THEME ──────────────────────────────────────────────── */
+[data-theme="light"] {
+  --background: #eef0f6;
+  --foreground: rgba(0, 0, 0, 0.85);
+
+  --bg-page: #eef0f6;
+  --bg-surface: rgba(255, 255, 255, 0.88);
+  --bg-surface-hover: rgba(255, 255, 255, 0.98);
+  --bg-sidebar: rgba(255, 255, 255, 0.78);
+  --bg-topbar: rgba(255, 255, 255, 0.72);
+
+  --text-1: rgba(0, 0, 0, 0.85);
+  --text-2: rgba(0, 0, 0, 0.55);
+  --text-3: rgba(0, 0, 0, 0.38);
+  --text-4: rgba(0, 0, 0, 0.24);
+
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --divide-color: rgba(0, 0, 0, 0.06);
+
+  --shadow-card: 0 2px 20px rgba(0,0,0,0.06), 0 1px 4px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.9);
+  --shadow-sm: 0 1px 4px rgba(0,0,0,0.08);
+  --scrollbar-color: rgba(0,0,0,0.12);
+  --scrollbar-hover: rgba(0,0,0,0.20);
+  --gradient-blob-1: rgba(0,122,255,0.04);
+  --gradient-blob-2: rgba(168,85,247,0.03);
+  --date-input-filter: invert(0.3);
+}
+
+/* ─── ACCENT: Blue (default) ───────────────────────────────────── */
+:root,
+[data-accent="blue"] {
+  --accent: #007AFF;
+  --accent-bg: rgba(0, 122, 255, 0.14);
+  --accent-border: rgba(0, 122, 255, 0.24);
+  --accent-shadow: rgba(0, 122, 255, 0.20);
+}
+
+/* ─── ACCENT: Purple ───────────────────────────────────────────── */
+[data-accent="purple"] {
+  --accent: #AF52DE;
+  --accent-bg: rgba(175, 82, 222, 0.14);
+  --accent-border: rgba(175, 82, 222, 0.24);
+  --accent-shadow: rgba(175, 82, 222, 0.20);
+}
+
+/* ─── ACCENT: Green ────────────────────────────────────────────── */
+[data-accent="green"] {
+  --accent: #30D158;
+  --accent-bg: rgba(48, 209, 88, 0.14);
+  --accent-border: rgba(48, 209, 88, 0.24);
+  --accent-shadow: rgba(48, 209, 88, 0.20);
+}
+
+/* ─── ACCENT: Rose ─────────────────────────────────────────────── */
+[data-accent="rose"] {
+  --accent: #FF375F;
+  --accent-bg: rgba(255, 55, 95, 0.14);
+  --accent-border: rgba(255, 55, 95, 0.24);
+  --accent-shadow: rgba(255, 55, 95, 0.20);
+}
+
+/* ─── ACCENT: Amber ────────────────────────────────────────────── */
+[data-accent="amber"] {
+  --accent: #FF9F0A;
+  --accent-bg: rgba(255, 159, 10, 0.14);
+  --accent-border: rgba(255, 159, 10, 0.24);
+  --accent-shadow: rgba(255, 159, 10, 0.20);
+}
+
+/* ─── BASE ─────────────────────────────────────────────────────── */
 *,
 *::before,
 *::after {
@@ -33,41 +147,29 @@ html {
 }
 
 body {
-  background: var(--background);
+  background: var(--bg-page);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   min-height: 100vh;
+  transition: background 0.3s ease, color 0.3s ease;
 }
 
-/* Date input styling in dark theme */
 input[type="date"]::-webkit-calendar-picker-indicator {
-  filter: invert(0.6);
+  filter: var(--date-input-filter);
   cursor: pointer;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--scrollbar-color);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.25);
-}
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
-/* Focus rings */
 :focus-visible {
-  outline: 2px solid rgba(0, 122, 255, 0.5);
+  outline: 2px solid var(--accent-border);
   outline-offset: 2px;
 }
 
-/* Ensure select portals sit above everything */
-[data-radix-popper-content-wrapper] {
-  z-index: 50;
-}
+[data-radix-popper-content-wrapper] { z-index: 50; }

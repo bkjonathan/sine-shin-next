@@ -30,23 +30,22 @@ export function Sidebar({ settings }: SidebarProps) {
 
   return (
     <aside className="w-64 shrink-0 flex flex-col h-screen sticky top-0">
-      {/* Glass sidebar surface */}
-      <div className="flex flex-col h-full bg-white/[0.05] backdrop-blur-2xl border-r border-white/10">
+      <div className="flex flex-col h-full bg-sidebar backdrop-blur-2xl border-r border-line">
         {/* Logo / Shop name */}
-        <div className="p-6 border-b border-white/10">
+        <div className="p-6 border-b border-line">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[#007AFF]/20 border border-[#007AFF]/30 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-accent-bg border border-accent-border flex items-center justify-center">
               {settings?.logoUrl ? (
                 <img src={settings.logoUrl} alt="Logo" className="w-6 h-6 object-contain rounded-lg" />
               ) : (
-                <Store className="h-5 w-5 text-[#007AFF]" />
+                <Store className="h-5 w-5 text-accent" />
               )}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-white/90 truncate">
+              <p className="text-sm font-semibold text-t1 truncate">
                 {settings?.shopName ?? "My Shop"}
               </p>
-              <p className="text-xs text-white/40">Management</p>
+              <p className="text-xs text-t3">Management</p>
             </div>
           </div>
         </div>
@@ -62,8 +61,8 @@ export function Sidebar({ settings }: SidebarProps) {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200",
                   isActive
-                    ? "bg-[#007AFF]/20 text-[#007AFF] border border-[#007AFF]/25 shadow-[0_2px_8px_rgba(0,122,255,0.15)]"
-                    : "text-white/60 hover:text-white/90 hover:bg-white/[0.08]"
+                    ? "bg-accent-bg text-accent border border-accent-border [box-shadow:0_2px_8px_var(--accent-shadow)]"
+                    : "text-t2 hover:text-t1 hover:bg-surface"
                 )}
               >
                 <Icon className="h-4.5 w-4.5 shrink-0" />
@@ -74,8 +73,8 @@ export function Sidebar({ settings }: SidebarProps) {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-white/10">
-          <p className="text-xs text-white/25 text-center">Shop Manager v1.0</p>
+        <div className="p-4 border-t border-line">
+          <p className="text-xs text-t4 text-center">Shop Manager v1.0</p>
         </div>
       </div>
     </aside>
