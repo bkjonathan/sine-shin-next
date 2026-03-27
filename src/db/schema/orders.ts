@@ -1,0 +1,33 @@
+import { pgTable, varchar, text, timestamp, doublePrecision, integer, boolean, date } from "drizzle-orm/pg-core";
+import { customers } from "./customers";
+
+export const orders = pgTable("orders", {
+  id: varchar("id", { length: 21 }).primaryKey(),
+  orderId: varchar("order_id", { length: 50 }).notNull().unique(),
+  customerId: varchar("customer_id", { length: 21 }).references(() => customers.id),
+  status: varchar("status", { length: 30 }).notNull().default("pending"),
+  orderFrom: text("order_from"),
+  exchangeRate: doublePrecision("exchange_rate").notNull().default(1),
+  shippingFee: doublePrecision("shipping_fee").notNull().default(0),
+  deliveryFee: doublePrecision("delivery_fee").notNull().default(0),
+  cargoFee: doublePrecision("cargo_fee").notNull().default(0),
+  serviceFee: doublePrecision("service_fee").notNull().default(0),
+  productDiscount: doublePrecision("product_discount"),
+  serviceFeeType: text("service_fee_type"),
+  shippingFeePaid: boolean("shipping_fee_paid"),
+  deliveryFeePaid: boolean("delivery_fee_paid"),
+  cargoFeePaid: boolean("cargo_fee_paid"),
+  serviceFeePaid: boolean("service_fee_paid"),
+  shippingFeeByShop: boolean("shipping_fee_by_shop"),
+  deliveryFeeByShop: boolean("delivery_fee_by_shop"),
+  cargoFeeByShop: boolean("cargo_fee_by_shop"),
+  excludeCargoFee: boolean("exclude_cargo_fee"),
+  orderDate: date("order_date"),
+  arrivedDate: date("arrived_date"),
+  shipmentDate: date("shipment_date"),
+  userWithdrawDate: date("user_withdraw_date"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }),
+  deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  synced: integer("synced"),
+});

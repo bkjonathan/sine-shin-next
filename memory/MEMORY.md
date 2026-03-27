@@ -1,0 +1,1 @@
+- [Shop Manager Implementation](project_shop_manager.md) — Full-stack shop management system: schema, API, hooks, glass UI components, and all pages implemented
