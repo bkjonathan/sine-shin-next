@@ -13,6 +13,7 @@
   --color-sidebar: var(--bg-sidebar);
   --color-topbar: var(--bg-topbar);
   --color-panel: var(--bg-panel);
+  --color-modal: var(--bg-modal);
   --color-field: var(--bg-field);
 
   --color-t1: var(--text-1);
@@ -51,6 +52,7 @@
   --bg-sidebar: rgba(7, 19, 31, 0.92);
   --bg-topbar: rgba(8, 21, 34, 0.72);
   --bg-panel: rgba(8, 18, 28, 0.88);
+  --bg-modal: rgba(7, 17, 27, 0.94);
   --bg-field: rgba(255, 255, 255, 0.06);
 
   --text-1: rgba(255, 255, 255, 0.90);
@@ -72,6 +74,7 @@
   --grid-line: rgba(192, 212, 237, 0.05);
   --card-highlight: rgba(255, 255, 255, 0.06);
   --bg-overlay: rgba(3, 11, 19, 0.68);
+  --bg-overlay-strong: rgba(3, 11, 19, 0.78);
   --date-input-filter: invert(0.6);
   --status-info: #32b8ff;
   --status-success: #31c97e;
@@ -90,6 +93,7 @@
   --bg-sidebar: rgba(255, 251, 245, 0.84);
   --bg-topbar: rgba(255, 255, 255, 0.74);
   --bg-panel: rgba(255, 255, 255, 0.88);
+  --bg-modal: rgba(255, 252, 248, 0.97);
   --bg-field: rgba(255, 255, 255, 0.9);
 
   --text-1: rgba(20, 31, 43, 0.92);
@@ -110,7 +114,8 @@
   --gradient-blob-2: rgba(245, 158, 11, 0.10);
   --grid-line: rgba(53, 70, 90, 0.04);
   --card-highlight: rgba(255, 255, 255, 0.7);
-  --bg-overlay: rgba(22, 28, 39, 0.18);
+  --bg-overlay: rgba(245, 240, 232, 0.62);
+  --bg-overlay-strong: rgba(245, 240, 232, 0.78);
   --date-input-filter: invert(0.3);
   --status-info: #007db8;
   --status-success: #0f9f62;
