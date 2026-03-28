@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { X, Download, Share } from "lucide-react";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -8,9 +8,17 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+function detectIOS(): boolean {
+  if (typeof navigator === "undefined") return false;
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent))
+  );
+}
+
 export function PwaInstallBanner() {
   const [show, setShow] = useState(false);
-  const [isIOS, setIsIOS] = useState(false);
+  const isIOS = useRef(false);
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
 
@@ -23,10 +31,9 @@ export function PwaInstallBanner() {
     // Dismissed before — respect the choice
     if (sessionStorage.getItem("pwa-banner-dismissed") === "1") return;
 
-    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    setIsIOS(ios);
+    isIOS.current = detectIOS();
 
-    if (ios) {
+    if (isIOS.current) {
       setShow(true);
       return;
     }
@@ -75,7 +82,7 @@ export function PwaInstallBanner() {
           Install Shop Manager
         </p>
 
-        {isIOS ? (
+        {isIOS.current ? (
           <p className="mt-0.5 text-xs text-[var(--text-2)]">
             Tap the{" "}
             <Share
@@ -91,7 +98,7 @@ export function PwaInstallBanner() {
           </p>
         )}
 
-        {!isIOS && (
+        {!isIOS.current && (
           <button
             onClick={install}
             className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white"
