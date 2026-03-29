@@ -309,4 +309,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 [data-compact="true"] .space-y-6 > * + * { margin-top: 0.75rem; }
 [data-compact="true"] .space-y-4 > * + * { margin-top: 0.5rem; }
 [data-compact="true"] .p-6  { padding: 1rem; }
+
+/* ─── PRINT (invoice) ───────────────────────────────────────────── */
+@media print {
+  body > * { display: none !important; }
+  #invoice-print-container {
+    display: block !important;
+    position: static !important;
+    left: auto !important;
+    top: auto !important;
+  }
+}
 [data-compact="true"] .p-5  { padding: 0.875rem; }

@@ -280,8 +280,10 @@ function OrderGrid({ orders, isLoading }: { orders: OrderRow[]; isLoading?: bool
               <span className={cn(
                 "rounded-full px-2.5 py-0.5 text-xs font-medium",
                 o.status === "completed" ? "bg-green-500/15 text-green-400" :
-                o.status === "processing" ? "bg-yellow-500/15 text-yellow-400" :
+                o.status === "ordered" ? "bg-yellow-500/15 text-yellow-400" :
                 o.status === "arrived" ? "bg-blue-500/15 text-blue-400" :
+                o.status === "shipping" ? "bg-yellow-500/15 text-yellow-400" :
+                o.status === "cancelled" ? "bg-red-500/15 text-red-400" :
                 "bg-surface-hover text-t2"
               )}>
                 {o.status.charAt(0).toUpperCase() + o.status.slice(1)}

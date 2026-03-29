@@ -354,10 +354,12 @@ interface TrashData {
 // ─── Trash Panel ──────────────────────────────────────────────────────────────
 
 const STATUS_COLORS: Record<string, string> = {
-  pending:    "bg-amber-500/15 text-amber-400",
-  processing: "bg-blue-500/15 text-blue-400",
-  arrived:    "bg-purple-500/15 text-purple-400",
-  completed:  "bg-green-500/15 text-green-400",
+  pending:   "bg-amber-500/15 text-amber-400",
+  ordered:   "bg-yellow-500/15 text-yellow-400",
+  arrived:   "bg-purple-500/15 text-purple-400",
+  shipping:  "bg-blue-500/15 text-blue-400",
+  completed: "bg-green-500/15 text-green-400",
+  cancelled: "bg-red-500/15 text-red-400",
 };
 
 const EXPENSE_CATEGORY_COLORS: Record<string, string> = {

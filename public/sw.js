@@ -34,11 +34,13 @@ self.addEventListener("fetch", (event) => {
 
   const url = new URL(event.request.url);
 
-  // Skip cross-origin requests, Next.js internals, and API routes
+  // Skip cross-origin requests, Next.js internals, API routes, and RSC requests
   if (
     url.origin !== self.location.origin ||
     url.pathname.startsWith("/_next/") ||
-    url.pathname.startsWith("/api/")
+    url.pathname.startsWith("/api/") ||
+    event.request.headers.get("rsc") === "1" ||
+    url.searchParams.has("_rsc")
   ) {
     return;
   }

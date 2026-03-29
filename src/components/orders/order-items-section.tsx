@@ -8,6 +8,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
 import { useAddOrderItem, useRemoveOrderItem } from "@/hooks/use-orders";
+import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import type { OrderItem } from "@/types";
 
@@ -20,6 +21,7 @@ export function OrderItemsSection({ orderId, items }: OrderItemsSectionProps) {
   const [adding, setAdding] = useState(false);
   const addItem = useAddOrderItem();
   const removeItem = useRemoveOrderItem();
+  const router = useRouter();
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<OrderItemInput>({
     resolver: zodResolver(orderItemSchema),
@@ -29,7 +31,7 @@ export function OrderItemsSection({ orderId, items }: OrderItemsSectionProps) {
   function onAdd(data: OrderItemInput) {
     addItem.mutate(
       { orderId, ...data },
-      { onSuccess: () => { reset(); setAdding(false); } }
+      { onSuccess: () => { reset(); setAdding(false); router.refresh(); } }
     );
   }
 
@@ -64,7 +66,7 @@ export function OrderItemsSection({ orderId, items }: OrderItemsSectionProps) {
                     <GlassButton
                       variant="ghost"
                       size="sm"
-                      onClick={() => removeItem.mutate({ orderId, itemId: item.id })}
+                      onClick={() => removeItem.mutate({ orderId, itemId: item.id }, { onSuccess: () => router.refresh() })}
                       className="hover:text-danger"
                       aria-label="Remove item"
                     >

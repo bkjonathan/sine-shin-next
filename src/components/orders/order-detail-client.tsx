@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, type ReactNode } from "react";
+import type { ShopSettings } from "@/types";
+import { InvoicePrintLayout } from "@/components/invoice/InvoicePrintLayout";
+import { InvoiceDownloadTemplate } from "@/components/invoice/InvoiceDownloadTemplate";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -33,10 +36,15 @@ import {
   Loader2,
   PackageCheck,
   Circle,
+  Truck as TruckIcon,
+  XCircle,
   Pencil,
   Check,
   X,
+  Printer,
+  Download,
 } from "lucide-react";
+import { GlassButton } from "@/components/ui/glass-button";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +62,7 @@ interface OrderDetailClientProps {
   order: Order;
   items: OrderItem[];
   customer: CustomerInfo | null;
+  shop: ShopSettings | null;
 }
 
 // ── Inline Edit Primitives ───────────────────────────────────────────────────
@@ -189,10 +198,13 @@ function InlineToggle({
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
-export function OrderDetailClient({ order: initialOrder, items: initialItems, customer: initialCustomer }: OrderDetailClientProps) {
+export function OrderDetailClient({ order: initialOrder, items: initialItems, customer: initialCustomer, shop }: OrderDetailClientProps) {
   const router = useRouter();
   const updateOrder = useUpdateOrder();
   const { prefs } = useCurrencyPrefs();
+  const downloadRef = useRef<HTMLDivElement>(null);
+  const printRef = useRef<HTMLDivElement>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Local optimistic state
   const [order, setOrder] = useState(initialOrder);
@@ -225,7 +237,6 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
   // ── Financial calculations ──────────────────────────────────────────
   const items = initialItems; // items are managed by OrderItemsSection
   const itemsSubtotal = items.reduce((s, i) => s + (i.price ?? 0) * (i.productQty ?? 0), 0);
-  const itemsSubtotalConverted = itemsSubtotal * order.exchangeRate;
   const totalQty = items.reduce((s, i) => s + (i.productQty ?? 0), 0);
   const totalWeight = items.reduce((s, i) => s + (i.productWeight ?? 0), 0);
   const discount = order.productDiscount ?? 0;
@@ -234,7 +245,9 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
   const deliveryFee = order.deliveryFee;
   const cargoFee = order.cargoFee;
   const serviceFeeRate = order.serviceFee;
-  const serviceFeeAmount = order.serviceFeeType === "%" ? itemsSubtotalConverted * (serviceFeeRate / 100) : serviceFeeRate;
+  // Service fee % applies to itemsSubtotal (primary currency), not the exchange-converted amount
+  const isPercentFee = order.serviceFeeType === "%" || order.serviceFeeType === "percent";
+  const serviceFeeAmount = isPercentFee ? itemsSubtotal * (serviceFeeRate / 100) : serviceFeeRate;
   const feesTotal = shippingFee + deliveryFee + cargoFee + serviceFeeAmount;
 
   const shopAbsorbedFees =
@@ -243,16 +256,20 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
     (order.cargoFeeByShop ? cargoFee : 0);
 
   const customerFees = feesTotal - shopAbsorbedFees;
-  const grandTotal = itemsSubtotalConverted - discount + customerFees;
+  // grandTotal stays in primary currency ($); exchange rate is applied only at display time
+  const grandTotal = itemsSubtotal - discount + customerFees;
+  const grandTotalInExchangeCurrency = grandTotal * order.exchangeRate;
 
   // ── Status timeline ─────────────────────────────────────────────────
   const statusSteps = [
     { key: "pending", label: "Pending", icon: Clock, date: order.orderDate },
-    { key: "processing", label: "Processing", icon: Loader2, date: order.shipmentDate },
+    { key: "ordered", label: "Ordered", icon: ShoppingBag, date: order.shipmentDate },
     { key: "arrived", label: "Arrived", icon: PackageCheck, date: order.arrivedDate },
+    { key: "shipping", label: "Shipping", icon: TruckIcon, date: order.shipmentDate },
     { key: "completed", label: "Completed", icon: CheckCircle2, date: order.userWithdrawDate },
   ];
-  const statusIndex = statusSteps.findIndex((s) => s.key === order.status);
+  const isCancelled = order.status === "cancelled";
+  const statusIndex = isCancelled ? -1 : statusSteps.findIndex((s) => s.key === order.status);
 
   // ── Fee detail rows ─────────────────────────────────────────────────
   const feeRows = [
@@ -264,6 +281,69 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
 
   const statusOptions = ORDER_STATUSES.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }));
   const sourceOptions = ORDER_FROM_OPTIONS.map((s) => ({ value: s, label: s }));
+
+  // ── Invoice values (all fees shown, no shop-absorbed deduction) ──────
+  const invoiceOrderTotal = itemsSubtotal + feesTotal;
+  const invoiceTotalWithExchange = invoiceOrderTotal * order.exchangeRate;
+
+  // ── Invoice actions ──────────────────────────────────────────────────
+  async function handleDownload() {
+    const el = downloadRef.current;
+    if (!el) return;
+    setIsDownloading(true);
+    try {
+      // Temporarily bring the element on-screen so the browser computes layout
+      el.style.position = "absolute";
+      el.style.left = "0";
+      el.style.top = "0";
+      el.style.zIndex = "-9999";
+      el.style.opacity = "0";
+      el.style.pointerEvents = "none";
+
+      // Wait for layout recalculation + images
+      await document.fonts.ready;
+      const images = el.querySelectorAll("img");
+      await Promise.all(
+        Array.from(images).map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => { img.onload = () => resolve(); img.onerror = () => resolve(); })
+        )
+      );
+      await new Promise((r) => setTimeout(r, 300));
+
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(el, {
+        pixelRatio: 2,
+        skipFonts: true,
+        width: 920,
+        height: el.scrollHeight || 1200,
+        style: {
+          position: "static",
+          left: "auto",
+          top: "auto",
+          opacity: "1",
+        },
+      });
+      const link = document.createElement("a");
+      link.download = `invoice_${order.orderId}.png`;
+      link.href = dataUrl;
+      link.click();
+    } finally {
+      // Restore off-screen positioning
+      el.style.position = "fixed";
+      el.style.left = "-9999px";
+      el.style.top = "-9999px";
+      el.style.zIndex = "";
+      el.style.opacity = "";
+      el.style.pointerEvents = "";
+      setIsDownloading(false);
+    }
+  }
+
+  function handlePrint() {
+    window.print();
+  }
 
   return (
     <div className="space-y-6">
@@ -281,6 +361,14 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
           actions={
             <div className="flex items-center gap-3">
               <OrderStatusBadge status={order.status} />
+              <GlassButton variant="ghost" size="sm" onClick={handlePrint}>
+                <Printer className="h-3.5 w-3.5" />
+                <span className="text-xs">Print</span>
+              </GlassButton>
+              <GlassButton variant="ghost" size="sm" onClick={handleDownload} loading={isDownloading}>
+                <Download className="h-3.5 w-3.5" />
+                <span className="text-xs">Download</span>
+              </GlassButton>
               <OrderDetailActions orderId={order.id} />
             </div>
           }
@@ -292,8 +380,8 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
       <GlassCard>
         <div className="flex items-center justify-between">
           {statusSteps.map((step, i) => {
-            const isCompleted = i <= statusIndex;
-            const isCurrent = i === statusIndex;
+            const isCompleted = !isCancelled && i <= statusIndex;
+            const isCurrent = !isCancelled && i === statusIndex;
             const Icon = step.icon;
             return (
               <div key={step.key} className="flex flex-1 items-center">
@@ -321,11 +409,31 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                   )}
                 </div>
                 {i < statusSteps.length - 1 && (
-                  <div className={cn("mx-2 h-0.5 flex-1 rounded-full transition-colors", i < statusIndex ? "bg-success" : "bg-line")} />
+                  <div className={cn("mx-2 h-0.5 flex-1 rounded-full transition-colors", !isCancelled && i < statusIndex ? "bg-success" : "bg-line")} />
                 )}
               </div>
             );
           })}
+          {/* Cancelled — separator + button */}
+          <div className="mx-2 h-0.5 flex-1 rounded-full bg-line" />
+          <div className="flex flex-col items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => save({ status: "cancelled" })}
+              title="Set status to Cancelled"
+              className={cn(
+                "flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all cursor-pointer",
+                isCancelled
+                  ? "border-danger bg-[rgba(255,80,80,0.14)] text-danger scale-110"
+                  : "border-line bg-surface text-t4 hover:border-line-strong hover:text-t3"
+              )}
+            >
+              <XCircle className="h-4.5 w-4.5" />
+            </button>
+            <span className={cn("text-xs font-medium", isCancelled ? "text-danger" : "text-t4")}>
+              Cancelled
+            </span>
+          </div>
         </div>
       </GlassCard>
 
@@ -409,21 +517,6 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                 <span className="font-medium text-t1">{formatCurrency(itemsSubtotal, prefs.currencySymbol)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="flex items-center gap-1.5 text-t3">
-                  <ArrowRightLeft className="h-3 w-3" />
-                  Exchange Rate ×
-                  <InlineText
-                    value={order.exchangeRate}
-                    displayValue={<span className="font-mono">{order.exchangeRate.toFixed(4)}</span>}
-                    type="number"
-                    step="0.0001"
-                    min="0.0001"
-                    onSave={(v) => save({ exchangeRate: parseFloat(v) || order.exchangeRate })}
-                  />
-                </span>
-                <span className="font-medium text-t1">{formatCurrency(itemsSubtotalConverted, prefs.currencySymbol)}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
                 <span className="text-t3 flex items-center gap-1.5">
                   Product Discount
                   {discount > 0 && <span className="text-danger">(-)</span>}
@@ -472,9 +565,9 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                       )}
                       {fee.type && (
                         <InlineToggle
-                          checked={fee.type === "%"}
-                          onToggle={(v) => save({ serviceFeeType: v ? "%" : "fixed" })}
-                          label={fee.type === "%" ? "%" : prefs.currencySymbol}
+                          checked={fee.type === "%" || fee.type === "percent"}
+                          onToggle={(v) => save({ serviceFeeType: v ? "percent" : "fixed" })}
+                          label={fee.type === "%" || fee.type === "percent" ? "%" : prefs.currencySymbol}
                           variant="neutral"
                         />
                       )}
@@ -506,7 +599,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-t3">Subtotal (items + fees)</span>
-                <span className="font-medium text-t1">{formatCurrency(itemsSubtotalConverted - discount + feesTotal, prefs.currencySymbol)}</span>
+                <span className="font-medium text-t1">{formatCurrency(itemsSubtotal - discount + feesTotal, prefs.currencySymbol)}</span>
               </div>
               {shopAbsorbedFees > 0 && (
                 <div className="flex justify-between text-sm">
@@ -516,10 +609,22 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
               )}
             </div>
 
-            <div className="mt-4 rounded-2xl border border-accent-border bg-accent-bg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-t1">Customer Pays</span>
-                <span className="text-xl font-bold text-accent">{formatCurrency(grandTotal, prefs.currencySymbol)}</span>
+            <div className="mt-4 space-y-2">
+              <div className="rounded-2xl border border-accent-border bg-accent-bg p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold text-t1">Total</span>
+                  <span className="text-xl font-bold text-accent">{formatCurrency(grandTotal, prefs.currencySymbol)}</span>
+                </div>
+              </div>
+              {serviceFeeAmount > 0 && (
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-sm font-semibold text-t2">Profit</span>
+                  <span className="text-lg font-bold text-success">{formatCurrency(serviceFeeAmount, prefs.currencySymbol)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between px-1">
+                <span className="text-sm font-semibold text-t2">Total × Exchange Rate</span>
+                <span className="text-lg font-bold text-accent">{prefs.exchangeCurrencySymbol} {grandTotalInExchangeCurrency.toLocaleString("en-US", { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
           </GlassCard>
@@ -697,6 +802,30 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
           <span className="text-sm text-t2">Saving...</span>
         </div>
       )}
+
+      {/* ── Hidden invoice templates (off-screen, captured by html-to-image / print) ── */}
+      <InvoicePrintLayout
+        ref={printRef}
+        shop={shop}
+        order={order}
+        customer={customer}
+        items={items}
+        itemsSubtotal={itemsSubtotal}
+        serviceFeeAmount={serviceFeeAmount}
+        orderTotal={invoiceOrderTotal}
+        totalWithExchange={invoiceTotalWithExchange}
+      />
+      <InvoiceDownloadTemplate
+        ref={downloadRef}
+        shop={shop}
+        order={order}
+        customer={customer}
+        items={items}
+        itemsSubtotal={itemsSubtotal}
+        serviceFeeAmount={serviceFeeAmount}
+        orderTotal={invoiceOrderTotal}
+        totalWithExchange={invoiceTotalWithExchange}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const ORDER_STATUSES = ["pending", "processing", "arrived", "completed"] as const;
+export const ORDER_STATUSES = ["pending", "ordered", "arrived", "shipping", "completed", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export const ORDER_FROM_OPTIONS = ["Facebook", "TikTok", "Telegram", "Line", "Instagram", "Other"] as const;

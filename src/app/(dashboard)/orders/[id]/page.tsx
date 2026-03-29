@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { orders, customers, orderItems } from "@/db/schema";
+import { orders, customers, orderItems, shopSettings } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { OrderDetailClient } from "@/components/orders/order-detail-client";
 
@@ -20,8 +20,8 @@ export default async function OrderDetailPage({ params }: Props) {
 
   if (!order) notFound();
 
-  // Run items + customer queries in parallel
-  const [items, customer] = await Promise.all([
+  // Run items, customer, and shop settings queries in parallel
+  const [items, customer, shop] = await Promise.all([
     db
       .select()
       .from(orderItems)
@@ -47,7 +47,8 @@ export default async function OrderDetailPage({ params }: Props) {
             return r[0] ?? null;
           })
       : Promise.resolve(null),
+    db.select().from(shopSettings).limit(1).then((r) => r[0] ?? null),
   ]);
 
-  return <OrderDetailClient order={order} items={items} customer={customer} />;
+  return <OrderDetailClient order={order} items={items} customer={customer} shop={shop} />;
 }
