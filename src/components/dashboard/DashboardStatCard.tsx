@@ -50,7 +50,7 @@ export function DashboardStatCard({
           : undefined
       }
     >
-      {dot && (
+      {dot && !clickable && (
         <span className={cn("absolute top-3 right-3 w-2 h-2 rounded-full", dot)} />
       )}
       {clickable && (

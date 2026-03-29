@@ -59,6 +59,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Load from localStorage only after hydration to avoid mismatch
   useEffect(() => {
     const stored = getStored();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setModeState(stored.mode);
     setAccentState(stored.accent);
     setFontSizeState(stored.fontSize);

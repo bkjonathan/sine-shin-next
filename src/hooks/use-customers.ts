@@ -8,13 +8,15 @@ import type { CreateCustomerInput, UpdateCustomerInput } from "@/validations/cus
 
 const QUERY_KEY = "customers";
 
-export function useCustomers(params: ListParams = {}) {
+export function useCustomers(params: ListParams & { enabled?: boolean } = {}) {
+  const { enabled = true, ...queryParams } = params;
   return useQuery({
-    queryKey: [QUERY_KEY, params],
+    queryKey: [QUERY_KEY, queryParams],
     queryFn: async () => {
-      const { data } = await api.get<ApiSuccess<Customer[]> & { meta: PaginationMeta }>("/customers", { params });
+      const { data } = await api.get<ApiSuccess<Customer[]> & { meta: PaginationMeta }>("/customers", { params: queryParams });
       return data;
     },
+    enabled,
   });
 }
 

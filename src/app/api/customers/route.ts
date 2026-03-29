@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
         ? ilike(customers.customerId, `%${search}%`)
         : searchField === "phone"
         ? ilike(customers.phone, `%${search}%`)
+        : searchField === "all"
+        ? sql`(${ilike(customers.name, `%${search}%`)} OR ${ilike(customers.customerId, `%${search}%`)})`
         : ilike(customers.name, `%${search}%`)
       : undefined;
 

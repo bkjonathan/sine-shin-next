@@ -67,6 +67,7 @@ export function DashboardStatsGrid({
         icon={CheckCircle}
         iconBg="bg-[#30D158]/15"
         iconText="text-[#30D158]"
+        dot="bg-[#30D158]"
         recordType="paid_cargo"
         onDrilldown={onDrilldown}
       />

@@ -18,7 +18,7 @@ function detectIOS(): boolean {
 
 export function PwaInstallBanner() {
   const [show, setShow] = useState(false);
-  const isIOS = useRef(false);
+  const [isIOS, setIsIOS] = useState(false);
   const [deferredPrompt, setDeferredPrompt] =
     useState<BeforeInstallPromptEvent | null>(null);
 
@@ -31,9 +31,12 @@ export function PwaInstallBanner() {
     // Dismissed before — respect the choice
     if (sessionStorage.getItem("pwa-banner-dismissed") === "1") return;
 
-    isIOS.current = detectIOS();
+    const ios = detectIOS();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsIOS(ios);
 
-    if (isIOS.current) {
+    if (ios) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setShow(true);
       return;
     }
@@ -82,7 +85,7 @@ export function PwaInstallBanner() {
           Install Shop Manager
         </p>
 
-        {isIOS.current ? (
+        {isIOS ? (
           <p className="mt-0.5 text-xs text-[var(--text-2)]">
             Tap the{" "}
             <Share
@@ -98,7 +101,7 @@ export function PwaInstallBanner() {
           </p>
         )}
 
-        {!isIOS.current && (
+        {!isIOS && (
           <button
             onClick={install}
             className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-[var(--accent)] px-3 py-1.5 text-xs font-medium text-white"
