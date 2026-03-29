@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,6 +11,7 @@ import { GlassSelect } from "@/components/ui/glass-select";
 import { GlassButton } from "@/components/ui/glass-button";
 import { CustomerCombobox } from "@/components/orders/customer-combobox";
 import { cn } from "@/lib/utils";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import type { Order } from "@/types";
 
 interface OrderFormProps {
@@ -43,7 +45,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
       cargoFee: defaultValues?.cargoFee ?? 0,
       serviceFee: defaultValues?.serviceFee ?? 0,
       serviceFeeType: defaultValues?.serviceFeeType ?? "%",
-      productDiscount: defaultValues?.productDiscount ?? undefined,
+      productDiscount: defaultValues?.productDiscount ?? 0,
       shippingFeeByShop: defaultValues?.shippingFeeByShop ?? false,
       deliveryFeeByShop: defaultValues?.deliveryFeeByShop ?? false,
       cargoFeeByShop: defaultValues?.cargoFeeByShop ?? false,
@@ -53,6 +55,13 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
+  const { prefs } = useCurrencyPrefs();
+
+  useEffect(() => {
+    if (!defaultValues?.exchangeRate) {
+      setValue("exchangeRate", prefs.exchangeRate);
+    }
+  }, [prefs.exchangeRate]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -200,7 +209,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
                   "hover:bg-surface-hover transition-colors"
                 )}
               >
-                {watch("serviceFeeType") === "%" ? "%" : "$"}
+                {watch("serviceFeeType") === "%" ? "%" : prefs.currencySymbol}
               </button>
             </div>
             {errors.serviceFee && <p className="mt-1.5 text-xs text-danger">{errors.serviceFee.message}</p>}

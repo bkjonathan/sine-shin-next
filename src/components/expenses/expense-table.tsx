@@ -9,6 +9,7 @@ import { GlassModal } from "@/components/ui/glass-modal";
 import { ExpenseForm } from "./expense-form";
 import { formatCurrency } from "@/lib/utils";
 import { useUpdateExpense, useDeleteExpense } from "@/hooks/use-expenses";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { Pencil, Trash2 } from "lucide-react";
 import type { Expense } from "@/types";
 import type { CreateExpenseInput } from "@/validations/expense.schema";
@@ -31,6 +32,7 @@ export function ExpenseTable({ expenses, isLoading }: ExpenseTableProps) {
   const [editing, setEditing] = useState<Expense | null>(null);
   const updateExpense = useUpdateExpense();
   const deleteExpense = useDeleteExpense();
+  const { prefs } = useCurrencyPrefs();
 
   const columns: ColumnDef<Expense>[] = [
     {
@@ -80,7 +82,7 @@ export function ExpenseTable({ expenses, isLoading }: ExpenseTableProps) {
       accessorKey: "amount",
       header: "SORT BY AMOUNT",
       cell: ({ row }) => (
-        <span className="font-semibold text-accent">{formatCurrency(row.original.amount)}</span>
+        <span className="font-semibold text-accent">{formatCurrency(row.original.amount, prefs.currencySymbol)}</span>
       ),
     },
     {

@@ -10,7 +10,7 @@ export async function GET(_req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const [settings] = await db.select().from(shopSettings).where(eq(shopSettings.id, "singleton")).limit(1);
+  const [settings] = await db.select().from(shopSettings).limit(1);
 
   if (!settings) {
     // Return defaults if no settings row exists yet
@@ -65,7 +65,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     // Upsert settings
-    const existing = await db.select().from(shopSettings).where(eq(shopSettings.id, "singleton")).limit(1);
+    const existing = await db.select().from(shopSettings).limit(1);
 
     if (existing.length === 0) {
       const [created] = await db.insert(shopSettings).values({ id: "singleton", ...parsed.data }).returning();
@@ -73,7 +73,7 @@ export async function PATCH(req: NextRequest) {
     } else {
       const [updated] = await db.update(shopSettings)
         .set({ ...parsed.data })
-        .where(eq(shopSettings.id, "singleton"))
+        .where(eq(shopSettings.id, existing[0].id))
         .returning();
       return NextResponse.json({ data: updated });
     }

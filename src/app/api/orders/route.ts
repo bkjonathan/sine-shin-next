@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { orders, customers, shopSettings, orderItems } from "@/db/schema";
+import { orders, customers, orderItems } from "@/db/schema";
 import { isNull, desc, asc, sql, eq, and, ilike } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createOrderSchema } from "@/validations/order.schema";
@@ -93,10 +93,17 @@ export async function POST(req: NextRequest) {
 
     const { items, ...orderData } = parsed.data;
 
-    const [settings] = await db.select().from(shopSettings).where(eq(shopSettings.id, "singleton")).limit(1);
-    const prefix = settings?.orderIdPrefix ?? "ORD";
-    const [{ count }] = await db.select({ count: sql<number>`count(*)::int` }).from(orders);
-    const orderId = `${prefix}-${String(count + 1).padStart(4, "0")}`;
+    const { shopSettings } = await import("@/db/schema");
+    const [settings] = await db
+      .select({ orderIdPrefix: shopSettings.orderIdPrefix })
+      .from(shopSettings)
+      .limit(1);
+    const prefix = (settings?.orderIdPrefix ?? "ORD").replace(/-+$/, "");
+    const [{ maxNum }] = await db
+      .select({ maxNum: sql<number>`coalesce(max(cast(split_part(order_id, '-', 2) as integer)), 0)` })
+      .from(orders)
+      .where(ilike(orders.orderId, `${prefix}-%`));
+    const orderId = `${prefix}-${String(maxNum + 1).padStart(5, "0")}`;
 
     const orderId_ = nanoid();
     const [createdOrder] = await db.insert(orders).values({

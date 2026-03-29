@@ -5,6 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassBadge } from "@/components/ui/glass-badge";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import type { DashboardOrder } from "@/types/dashboard";
 
 const STATUS_VARIANT: Record<string, "neutral" | "warning" | "info" | "success" | "danger"> = {
@@ -52,6 +53,7 @@ interface DashboardRecentOrdersProps {
 }
 
 export function DashboardRecentOrders({ orders, isLoading }: DashboardRecentOrdersProps) {
+  const { prefs } = useCurrencyPrefs();
   return (
     <GlassCard padding="none" className="lg:col-span-3">
       <div className="flex items-center justify-between px-5 py-4 border-b border-divide">
@@ -96,7 +98,7 @@ export function DashboardRecentOrders({ orders, isLoading }: DashboardRecentOrde
               </div>
               <div className="flex flex-col items-end gap-1 shrink-0">
                 <p className="text-sm font-semibold text-t1">
-                  {formatCurrency(order.totalPrice ?? 0)}
+                  {formatCurrency(order.totalPrice ?? 0, prefs.currencySymbol)}
                 </p>
                 <div className="flex items-center gap-1.5">
                   {order.status && (

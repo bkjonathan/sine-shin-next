@@ -7,7 +7,7 @@ export const ORDER_FROM_OPTIONS = ["Facebook", "TikTok", "Telegram", "Line", "In
 
 export const orderItemSchema = z.object({
   id: z.string().optional(),
-  productUrl: z.string().url("Must be a valid URL").optional().nullable().or(z.literal("")),
+  productUrl: z.string().optional().nullable(),
   productQty: z.number().int().positive("Quantity must be positive").optional().nullable(),
   price: z.number().min(0, "Price must be non-negative").optional().nullable(),
   productWeight: z.number().min(0).optional().nullable(),

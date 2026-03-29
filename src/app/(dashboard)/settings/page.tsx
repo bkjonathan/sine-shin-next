@@ -11,6 +11,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useTheme, type ThemeAccent, type FontSize } from "@/contexts/theme-context";
 import { useSettings, useUpdateSettings, useChangePassword } from "@/hooks/use-settings";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import {
   updateSettingsSchema,
   changePasswordSchema,
@@ -62,37 +63,6 @@ const FONT_SIZES: { value: FontSize; label: string; sample: string }[] = [
   { value: "x-large", label: "Extra Large", sample: "Aa" },
 ];
 
-// ─── Currency stored in localStorage ─────────────────────────────────────────
-
-interface CurrencyPrefs {
-  currencyCode:         string;
-  currencySymbol:       string;
-  exchangeCurrencyCode: string;
-  exchangeCurrencySymbol: string;
-}
-
-const CURRENCY_DEFAULTS: CurrencyPrefs = {
-  currencyCode:           "USD",
-  currencySymbol:         "$",
-  exchangeCurrencyCode:   "MMK",
-  exchangeCurrencySymbol: "Ks",
-};
-
-function useCurrencyPrefs() {
-  const [prefs, setPrefs] = useState<CurrencyPrefs>(CURRENCY_DEFAULTS);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("currency-prefs");
-    if (stored) setPrefs(JSON.parse(stored));
-  }, []);
-
-  function update(next: CurrencyPrefs) {
-    setPrefs(next);
-    localStorage.setItem("currency-prefs", JSON.stringify(next));
-  }
-
-  return { prefs, update };
-}
 
 // ─── Primitives ───────────────────────────────────────────────────────────────
 
@@ -230,6 +200,12 @@ function GeneralPanel() {
           label="Exchange Currency Symbol"
           value={currency.exchangeCurrencySymbol}
           onChange={(e) => setCurrency({ ...currency, exchangeCurrencySymbol: e.target.value })}
+        />
+        <GlassInput
+          label="Exchange Rate"
+          type="number"
+          value={currency.exchangeRate}
+          onChange={(e) => setCurrency({ ...currency, exchangeRate: parseFloat(e.target.value) || 1 })}
         />
       </div>
       <div className="mt-6 flex justify-end">

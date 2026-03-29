@@ -14,13 +14,14 @@ export function cn(...inputs: ClassValue[]) {
  */
 export function formatCurrency(
   amount: number,
+  symbol = "$",
   locale = "en-US"
 ): string {
   const formatted = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(amount);
-  return `$ ${formatted}`;
+  return `${symbol} ${formatted}`;
 }
 
 /**

@@ -10,6 +10,7 @@ import { GlassSelect } from "@/components/ui/glass-select";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { ExpenseForm } from "@/components/expenses/expense-form";
 import { formatCurrency } from "@/lib/utils";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { Plus, Download, Upload, ArrowUp, ArrowDown, LayoutGrid, List } from "lucide-react";
 import type { CreateExpenseInput } from "@/validations/expense.schema";
 import { EXPENSE_CATEGORIES } from "@/validations/expense.schema";
@@ -51,6 +52,7 @@ export default function ExpensesPage() {
   const [view, setView] = useState<"table" | "grid">("table");
   const [creating, setCreating] = useState(false);
   const createExpense = useCreateExpense();
+  const { prefs } = useCurrencyPrefs();
 
   const { data, isLoading } = useExpenses({
     page, search, searchField,
@@ -142,19 +144,19 @@ export default function ExpensesPage() {
         <div className="rounded-2xl border border-line bg-surface p-4">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-t3">Total Expense</p>
           <p className="text-2xl font-bold text-accent">
-            {formatCurrency(stats?.totalAmount ?? 0)}
+            {formatCurrency(stats?.totalAmount ?? 0, prefs.currencySymbol)}
           </p>
         </div>
         <div className="rounded-2xl border border-line bg-surface p-4">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-t3">This Month</p>
           <p className="text-2xl font-bold text-t1">
-            {formatCurrency(stats?.thisMonthAmount ?? 0)}
+            {formatCurrency(stats?.thisMonthAmount ?? 0, prefs.currencySymbol)}
           </p>
         </div>
         <div className="rounded-2xl border border-line bg-surface p-4">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-t3">Average Expense</p>
           <p className="text-2xl font-bold text-t1">
-            {formatCurrency(stats?.avgAmount ?? 0)}
+            {formatCurrency(stats?.avgAmount ?? 0, prefs.currencySymbol)}
           </p>
         </div>
       </div>
@@ -281,7 +283,7 @@ function ExpenseGrid({ expenses, isLoading }: { expenses: Expense[]; isLoading?:
                 <p className="text-xs text-t3">{e.description.split("\n").slice(1).join(" ")}</p>
               )}
             </div>
-            <span className="shrink-0 text-base font-bold text-accent">{formatCurrency(e.amount)}</span>
+            <span className="shrink-0 text-base font-bold text-accent">{formatCurrency(e.amount, prefs.currencySymbol)}</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="rounded-full border border-line bg-surface-hover px-2.5 py-0.5 text-xs text-t2 capitalize">

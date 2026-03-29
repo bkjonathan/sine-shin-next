@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
       .from(shopSettings)
       .where(eq(shopSettings.id, "singleton"))
       .limit(1);
-    const prefix = settings?.customerIdPrefix ?? "SSC";
+    const prefix = (settings?.customerIdPrefix ?? "SSC").replace(/-+$/, "");
 
     // Derive next number from the max existing ID to avoid gaps from soft-deletes
     const [{ maxNum }] = await db

@@ -13,6 +13,7 @@ import { CustomerCombobox } from "@/components/orders/customer-combobox";
 import { PageHeader } from "@/components/layout/page-header";
 import { useUpdateOrder } from "@/hooks/use-orders";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { ORDER_STATUSES, ORDER_FROM_OPTIONS } from "@/validations/order.schema";
 import type { Order, OrderItem } from "@/types";
 import {
@@ -191,6 +192,7 @@ function InlineToggle({
 export function OrderDetailClient({ order: initialOrder, items: initialItems, customer: initialCustomer }: OrderDetailClientProps) {
   const router = useRouter();
   const updateOrder = useUpdateOrder();
+  const { prefs } = useCurrencyPrefs();
 
   // Local optimistic state
   const [order, setOrder] = useState(initialOrder);
@@ -231,8 +233,9 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
   const shippingFee = order.shippingFee;
   const deliveryFee = order.deliveryFee;
   const cargoFee = order.cargoFee;
-  const serviceFee = order.serviceFee;
-  const feesTotal = shippingFee + deliveryFee + cargoFee + serviceFee;
+  const serviceFeeRate = order.serviceFee;
+  const serviceFeeAmount = order.serviceFeeType === "%" ? itemsSubtotalConverted * (serviceFeeRate / 100) : serviceFeeRate;
+  const feesTotal = shippingFee + deliveryFee + cargoFee + serviceFeeAmount;
 
   const shopAbsorbedFees =
     (order.shippingFeeByShop ? shippingFee : 0) +
@@ -256,7 +259,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
     { key: "shipping" as const, label: "Shipping Fee", field: "shippingFee" as const, amount: shippingFee, paid: order.shippingFeePaid, paidField: "shippingFeePaid" as const, byShop: order.shippingFeeByShop, byShopField: "shippingFeeByShop" as const },
     { key: "delivery" as const, label: "Delivery Fee", field: "deliveryFee" as const, amount: deliveryFee, paid: order.deliveryFeePaid, paidField: "deliveryFeePaid" as const, byShop: order.deliveryFeeByShop, byShopField: "deliveryFeeByShop" as const },
     { key: "cargo" as const, label: "Cargo Fee", field: "cargoFee" as const, amount: cargoFee, paid: order.cargoFeePaid, paidField: "cargoFeePaid" as const, byShop: order.cargoFeeByShop, byShopField: "cargoFeeByShop" as const, excluded: order.excludeCargoFee },
-    { key: "service" as const, label: "Service Fee", field: "serviceFee" as const, amount: serviceFee, paid: order.serviceFeePaid, paidField: "serviceFeePaid" as const, byShop: null, byShopField: null, type: order.serviceFeeType },
+    { key: "service" as const, label: "Service Fee", field: "serviceFee" as const, amount: serviceFeeRate, computedAmount: serviceFeeAmount, paid: order.serviceFeePaid, paidField: "serviceFeePaid" as const, byShop: null, byShopField: null, type: order.serviceFeeType },
   ];
 
   const statusOptions = ORDER_STATUSES.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }));
@@ -335,7 +338,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-t4">Items</p>
-              <p className="text-lg font-bold text-t1">{formatCurrency(itemsSubtotal)}</p>
+              <p className="text-lg font-bold text-t1">{formatCurrency(itemsSubtotal, prefs.currencySymbol)}</p>
               <p className="text-[10px] text-t4">{totalQty} item{totalQty !== 1 ? "s" : ""}</p>
             </div>
           </div>
@@ -348,8 +351,8 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-t4">Fees</p>
-              <p className="text-lg font-bold text-t1">{formatCurrency(feesTotal)}</p>
-              <p className="text-[10px] text-t4">{shopAbsorbedFees > 0 ? `${formatCurrency(shopAbsorbedFees)} by shop` : "All charged"}</p>
+              <p className="text-lg font-bold text-t1">{formatCurrency(feesTotal, prefs.currencySymbol)}</p>
+              <p className="text-[10px] text-t4">{shopAbsorbedFees > 0 ? `${formatCurrency(shopAbsorbedFees, prefs.currencySymbol)} by shop` : "All charged"}</p>
             </div>
           </div>
         </GlassCard>
@@ -361,8 +364,8 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             </div>
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-t4">Grand Total</p>
-              <p className="text-lg font-bold text-t1">{formatCurrency(grandTotal)}</p>
-              {discount > 0 && <p className="text-[10px] text-danger">-{formatCurrency(discount)} disc.</p>}
+              <p className="text-lg font-bold text-t1">{formatCurrency(grandTotal, prefs.currencySymbol)}</p>
+              {discount > 0 && <p className="text-[10px] text-danger">-{formatCurrency(discount, prefs.currencySymbol)} disc.</p>}
             </div>
           </div>
         </GlassCard>
@@ -403,7 +406,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-t3">Items Subtotal ({totalQty} × avg)</span>
-                <span className="font-medium text-t1">{formatCurrency(itemsSubtotal)}</span>
+                <span className="font-medium text-t1">{formatCurrency(itemsSubtotal, prefs.currencySymbol)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="flex items-center gap-1.5 text-t3">
@@ -418,7 +421,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                     onSave={(v) => save({ exchangeRate: parseFloat(v) || order.exchangeRate })}
                   />
                 </span>
-                <span className="font-medium text-t1">{formatCurrency(itemsSubtotalConverted)}</span>
+                <span className="font-medium text-t1">{formatCurrency(itemsSubtotalConverted, prefs.currencySymbol)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-t3 flex items-center gap-1.5">
@@ -427,7 +430,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                 </span>
                 <InlineText
                   value={discount}
-                  displayValue={<span className={cn("font-medium", discount > 0 ? "text-danger" : "text-t1")}>{discount > 0 ? `-${formatCurrency(discount)}` : formatCurrency(0)}</span>}
+                  displayValue={<span className={cn("font-medium", discount > 0 ? "text-danger" : "text-t1")}>{discount > 0 ? `-${formatCurrency(discount, prefs.currencySymbol)}` : formatCurrency(0, prefs.currencySymbol)}</span>}
                   type="number"
                   step="0.01"
                   min="0"
@@ -471,7 +474,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                         <InlineToggle
                           checked={fee.type === "%"}
                           onToggle={(v) => save({ serviceFeeType: v ? "%" : "fixed" })}
-                          label={fee.type === "%" ? "%" : "$"}
+                          label={fee.type === "%" ? "%" : prefs.currencySymbol}
                           variant="neutral"
                         />
                       )}
@@ -481,7 +484,11 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                     value={fee.amount}
                     displayValue={
                       <span className={cn("font-medium", fee.byShop ? "text-t4 line-through" : "text-t1")}>
-                        {formatCurrency(fee.amount)}
+                        {fee.computedAmount !== undefined && fee.type === "%" ? (
+                          <>{formatCurrency(fee.computedAmount, prefs.currencySymbol)} <span className="text-xs text-t3">({fee.amount}%)</span></>
+                        ) : (
+                          formatCurrency(fee.amount, prefs.currencySymbol)
+                        )}
                       </span>
                     }
                     type="number"
@@ -499,12 +506,12 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-t3">Subtotal (items + fees)</span>
-                <span className="font-medium text-t1">{formatCurrency(itemsSubtotalConverted - discount + feesTotal)}</span>
+                <span className="font-medium text-t1">{formatCurrency(itemsSubtotalConverted - discount + feesTotal, prefs.currencySymbol)}</span>
               </div>
               {shopAbsorbedFees > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-warning">Shop Absorbed Fees</span>
-                  <span className="font-medium text-warning">-{formatCurrency(shopAbsorbedFees)}</span>
+                  <span className="font-medium text-warning">-{formatCurrency(shopAbsorbedFees, prefs.currencySymbol)}</span>
                 </div>
               )}
             </div>
@@ -512,7 +519,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             <div className="mt-4 rounded-2xl border border-accent-border bg-accent-bg p-4">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-t1">Customer Pays</span>
-                <span className="text-xl font-bold text-accent">{formatCurrency(grandTotal)}</span>
+                <span className="text-xl font-bold text-accent">{formatCurrency(grandTotal, prefs.currencySymbol)}</span>
               </div>
             </div>
           </GlassCard>

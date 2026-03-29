@@ -5,6 +5,7 @@ import {
   CheckCircle, XCircle, Ban,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { DashboardStatCard } from "./DashboardStatCard";
 import type { DashboardStats, DashboardRecordType } from "@/types/dashboard";
 
@@ -19,8 +20,9 @@ export function DashboardStatsGrid({
   isLoading,
   onDrilldown,
 }: DashboardStatsGridProps) {
+  const { prefs } = useCurrencyPrefs();
   const v = (n: number | undefined) =>
-    isLoading || !stats ? "—" : formatCurrency(n ?? 0);
+    isLoading || !stats ? "—" : formatCurrency(n ?? 0, prefs.currencySymbol);
 
   const profit = stats?.total_profit ?? 0;
   const positiveProfit = profit >= 0;

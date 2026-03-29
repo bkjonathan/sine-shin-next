@@ -13,6 +13,7 @@ import { Plus, Download, Upload, Printer, ArrowUp, ArrowDown, LayoutGrid, List }
 import type { CreateOrderInput } from "@/validations/order.schema";
 import { ORDER_STATUSES } from "@/validations/order.schema";
 import { cn } from "@/lib/utils";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 
 type SortOrder = "asc" | "desc";
 
@@ -46,6 +47,7 @@ export default function OrdersPage() {
   const [view, setView] = useState<"table" | "grid">("table");
   const [creating, setCreating] = useState(false);
   const createOrder = useCreateOrder();
+  const { prefs } = useCurrencyPrefs();
 
   const { data, isLoading } = useOrders({ page, search, searchField, status, limit, sort, order });
 
@@ -294,7 +296,7 @@ function OrderGrid({ orders, isLoading }: { orders: OrderRow[]; isLoading?: bool
               </div>
             )}
             <div className="flex items-center justify-between text-xs text-t3">
-              <span>$ {total.toLocaleString()}</span>
+              <span>{prefs.currencySymbol} {total.toLocaleString()}</span>
               <span>{new Date(o.createdAt).toLocaleDateString()}</span>
             </div>
           </div>

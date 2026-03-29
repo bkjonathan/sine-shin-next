@@ -2,6 +2,7 @@
 
 import { GlassModal } from "@/components/ui/glass-modal";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import type { DashboardDetailRecord, DashboardRecordType } from "@/types/dashboard";
 
 const RECORD_TYPE_LABELS: Record<DashboardRecordType, string> = {
@@ -25,6 +26,7 @@ export function DashboardDetailModal({
   type,
   records,
 }: DashboardDetailModalProps) {
+  const { prefs } = useCurrencyPrefs();
   const title = type ? RECORD_TYPE_LABELS[type] : "Details";
   const total = records.reduce((s, r) => s + r.amount, 0);
 
@@ -58,7 +60,7 @@ export function DashboardDetailModal({
                         {r.customer_name ?? "—"}
                       </td>
                       <td className="px-4 py-3 text-right font-semibold text-t1">
-                        {formatCurrency(r.amount)}
+                        {formatCurrency(r.amount, prefs.currencySymbol)}
                       </td>
                       <td className="px-4 py-3 text-xs text-t3">
                         {r.order_date ? formatDate(r.order_date, "d MMM yyyy") : "—"}
@@ -72,7 +74,7 @@ export function DashboardDetailModal({
                       Total ({records.length} orders)
                     </td>
                     <td className="px-4 py-3 text-right font-bold text-t1">
-                      {formatCurrency(total)}
+                      {formatCurrency(total, prefs.currencySymbol)}
                     </td>
                     <td />
                   </tr>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useAccountSummary } from "@/hooks/useAccountSummary";
 import { GlassCard } from "@/components/ui/glass-card";
 import { formatCurrency } from "@/lib/utils";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { cn } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, DollarSign, Receipt,
@@ -44,9 +45,10 @@ type Tab = "summary" | "income" | "expenses";
 export default function AccountPage() {
   const [tab, setTab] = useState<Tab>("summary");
   const { summary, isLoading } = useAccountSummary();
+  const { prefs } = useCurrencyPrefs();
 
   const v = (n: number | undefined) =>
-    isLoading || !summary ? "—" : formatCurrency(n ?? 0);
+    isLoading || !summary ? "—" : formatCurrency(n ?? 0, prefs.currencySymbol);
 
   const netBalance = summary?.net_balance ?? 0;
   const netPositive = netBalance >= 0;
@@ -81,7 +83,7 @@ export default function AccountPage() {
               "text-3xl font-bold mt-0.5",
               netPositive ? "text-success" : "text-danger"
             )}>
-              {isLoading ? "—" : formatCurrency(netBalance)}
+              {isLoading ? "—" : formatCurrency(netBalance, prefs.currencySymbol)}
             </p>
           </div>
         </div>
@@ -187,7 +189,7 @@ export default function AccountPage() {
               {[
                 { label: "Total Income",   value: v(summary?.total_income),   color: "text-success", icon: TrendingUp   },
                 { label: "Total Expenses", value: v(summary?.total_expenses),  color: "text-danger", icon: TrendingDown },
-                { label: "Net Balance",    value: isLoading ? "—" : formatCurrency(netBalance), color: netPositive ? "text-success" : "text-danger", icon: DollarSign },
+                { label: "Net Balance",    value: isLoading ? "—" : formatCurrency(netBalance, prefs.currencySymbol), color: netPositive ? "text-success" : "text-danger", icon: DollarSign },
               ].map(({ label, value, color, icon: Icon }) => (
                 <div key={label} className="text-center p-4 rounded-xl bg-surface border border-line">
                   <Icon className={cn("h-5 w-5 mx-auto mb-2", color)} />

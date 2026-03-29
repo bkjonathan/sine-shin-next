@@ -7,6 +7,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { OrderStatusBadge } from "./order-status-badge";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { useDeleteOrder } from "@/hooks/use-orders";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { Pencil, Trash2, Printer } from "lucide-react";
 import Link from "next/link";
 
@@ -34,6 +35,7 @@ interface OrderTableProps {
 export function OrderTable({ orders, isLoading, pageOffset = 0 }: OrderTableProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const deleteOrder = useDeleteOrder();
+  const { prefs } = useCurrencyPrefs();
 
   const allIds = orders.map((o) => o.id);
   const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
@@ -65,7 +67,7 @@ export function OrderTable({ orders, isLoading, pageOffset = 0 }: OrderTableProp
       <h2>${o.orderId}</h2>
       ${o.customerName ? `<p>Customer: ${o.customerName}</p>` : ""}
       <p>Status: ${o.status}</p>
-      <p>Total: $${total.toLocaleString()}</p>
+      <p>Total: ${prefs.currencySymbol}${total.toLocaleString()}</p>
       <p>Date: ${formatDate(o.createdAt)}</p>
       <script>window.onload=()=>{window.print();window.close()}</script>
       </body></html>
@@ -150,7 +152,7 @@ export function OrderTable({ orders, isLoading, pageOffset = 0 }: OrderTableProp
           (row.original.deliveryFee ?? 0) +
           (row.original.cargoFee ?? 0) +
           (row.original.serviceFee ?? 0);
-        return <span className="text-sm font-semibold text-t1">{formatCurrency(total)}</span>;
+        return <span className="text-sm font-semibold text-t1">{formatCurrency(total, prefs.currencySymbol)}</span>;
       },
     },
     {
