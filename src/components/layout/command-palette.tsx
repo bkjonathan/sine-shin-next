@@ -3,22 +3,30 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Command } from "cmdk";
-import { Search, LayoutDashboard, Users, ShoppingCart, Receipt, Settings, CornerDownLeft } from "lucide-react";
+import { Search, LayoutDashboard, Users, ShoppingCart, Receipt, Settings, CornerDownLeft, UserCog } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 
 const COMMANDS = [
-  { id: "dashboard", label: "Go to Dashboard", icon: LayoutDashboard, href: "/dashboard" },
-  { id: "customers", label: "Go to Customers", icon: Users, href: "/customers" },
-  { id: "orders", label: "Go to Orders", icon: ShoppingCart, href: "/orders" },
-  { id: "expenses", label: "Go to Expenses", icon: Receipt, href: "/expenses" },
-  { id: "settings", label: "Go to Settings", icon: Settings, href: "/settings" },
+  { id: "dashboard", label: "Go to Dashboard", icon: LayoutDashboard, href: "/dashboard", desc: "Overview, stats, and daily activity" },
+  { id: "customers", label: "Go to Customers", icon: Users, href: "/customers", desc: "Profiles, search, and customer management" },
+  { id: "orders", label: "Go to Orders", icon: ShoppingCart, href: "/orders", desc: "Order queue, status, and fulfillment" },
+  { id: "expenses", label: "Go to Expenses", icon: Receipt, href: "/expenses", desc: "Costs, records, and accounting inputs" },
+  { id: "users", label: "Go to Users", icon: UserCog, href: "/users", ownerOnly: true, desc: "Manage team members and roles" },
+  { id: "settings", label: "Go to Settings", icon: Settings, href: "/settings", desc: "Workspace preferences and configuration" },
 ];
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const userRole = (session?.user as { role?: string } | undefined)?.role;
+
+  const filteredCommands = COMMANDS.filter(
+    (cmd) => !("ownerOnly" in cmd && cmd.ownerOnly) || userRole === "owner"
+  );
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -98,7 +106,7 @@ export function CommandPalette() {
               </Command.Empty>
 
               <Command.Group>
-                {COMMANDS.map(({ id, label, icon: Icon, href }) => (
+                {filteredCommands.map(({ id, label, icon: Icon, href, desc }) => (
                   <Command.Item
                     key={id}
                     value={label}
@@ -116,13 +124,9 @@ export function CommandPalette() {
 
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[15px] font-medium text-current">{label}</p>
-                      <p className="mt-0.5 text-xs text-t3">
-                        {href === "/dashboard" && "Overview, stats, and daily activity"}
-                        {href === "/customers" && "Profiles, search, and customer management"}
-                        {href === "/orders" && "Order queue, status, and fulfillment"}
-                        {href === "/expenses" && "Costs, records, and accounting inputs"}
-                        {href === "/settings" && "Workspace preferences and configuration"}
-                      </p>
+                      {desc && (
+                        <p className="mt-0.5 text-xs text-t3">{desc}</p>
+                      )}
                     </div>
 
                     {(pathname === href || pathname.startsWith(`${href}/`)) ? (

@@ -18,6 +18,7 @@ const SECTION_LABELS: Record<string, string> = {
   "/customers": "Customers",
   "/orders": "Orders",
   "/expenses": "Expenses",
+  "/users": "Users",
   "/account": "Account Book",
   "/settings": "Settings",
 };
@@ -77,7 +78,7 @@ export function Topbar({ settings, onMenuClick }: TopbarProps) {
               <p className="text-sm font-medium text-t1">
                 {session?.user?.name ?? "User"}
               </p>
-              <p className="text-xs text-t3">Signed in</p>
+              <p className="text-xs text-t3 capitalize">{(session?.user as { role?: string } | undefined)?.role ?? "staff"}</p>
             </div>
             <GlassButton
               variant="ghost"

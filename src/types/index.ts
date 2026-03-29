@@ -33,7 +33,7 @@ export type ShopSettings = InferSelectModel<typeof shopSettings>;
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
-export type UserRole = "owner" | "staff";
+export type UserRole = "owner" | "manager" | "staff";
 
 // ── API response envelope ─────────────────────────────────────────────────────
 

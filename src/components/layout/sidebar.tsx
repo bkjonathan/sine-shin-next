@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
+import { useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Users,
@@ -12,6 +13,7 @@ import {
   Store,
   X,
   Sparkles,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ShopSettings } from "@/types";
@@ -27,8 +29,9 @@ const navItems = [
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/orders", label: "Orders", icon: ShoppingCart },
   { href: "/expenses", label: "Expenses", icon: Receipt },
+  { href: "/users", label: "Users", icon: UserCog, ownerOnly: true },
   { href: "/settings", label: "Settings", icon: Settings },
-];
+] as const;
 
 function BrandBlock({
   settings,
@@ -106,7 +109,13 @@ export function Sidebar({
   onMobileOpenChange,
 }: SidebarProps) {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const userRole = (session?.user as { role?: string } | undefined)?.role;
   const closeMobile = () => onMobileOpenChange?.(false);
+
+  const filteredNavItems = navItems.filter(
+    (item) => !("ownerOnly" in item && item.ownerOnly) || userRole === "owner"
+  );
 
   useEffect(() => {
     onMobileOpenChange?.(false);
@@ -130,7 +139,7 @@ export function Sidebar({
           </div>
 
           <nav className="mt-4 flex-1 space-y-2 overflow-y-auto rounded-[28px] border border-line bg-surface p-3">
-            {navItems.map(({ href, label, icon }) => {
+            {filteredNavItems.map(({ href, label, icon }) => {
               const isActive =
                 pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
               return (
@@ -192,7 +201,7 @@ export function Sidebar({
           </div>
 
           <nav className="mt-6 space-y-2">
-            {navItems.map(({ href, label, icon }) => {
+            {filteredNavItems.map(({ href, label, icon }) => {
               const isActive =
                 pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
               return (
@@ -212,7 +221,7 @@ export function Sidebar({
 
       <nav className="mobile-safe-bottom fixed inset-x-3 bottom-3 z-30 lg:hidden">
         <div className="mx-auto flex max-w-xl items-center justify-between gap-1 rounded-[24px] border border-line bg-sidebar px-2 py-2 shadow-[var(--shadow-card)] backdrop-blur-2xl">
-          {navItems.map(({ href, label, icon }) => {
+          {filteredNavItems.map(({ href, label, icon }) => {
             const isActive =
               pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
             return (
