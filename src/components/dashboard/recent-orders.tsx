@@ -20,9 +20,11 @@ interface RecentOrdersProps {
 
 const statusVariant: Record<OrderStatus, "neutral" | "warning" | "info" | "success"> = {
   pending:    "neutral",
-  processing: "warning",
+  ordered:    "warning",
   arrived:    "info",
+  shipping:   "warning",
   completed:  "success",
+  cancelled:  "neutral",
 };
 
 export function RecentOrders({ orders }: RecentOrdersProps) {
