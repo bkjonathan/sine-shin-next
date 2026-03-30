@@ -38,8 +38,8 @@ export function OrderItemsSection({ orderId, items }: OrderItemsSectionProps) {
   return (
     <div className="space-y-4">
       {items.length > 0 && (
-        <div className="overflow-hidden rounded-[24px] border border-line bg-surface shadow-[var(--shadow-sm)]">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto rounded-[24px] border border-line bg-surface shadow-[var(--shadow-sm)]">
+          <table className="min-w-[480px] w-full text-sm">
             <thead>
               <tr className="border-b border-divide bg-topbar">
                 <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.18em] text-t3">Product URL</th>
@@ -83,8 +83,8 @@ export function OrderItemsSection({ orderId, items }: OrderItemsSectionProps) {
       {adding ? (
         <GlassCard padding="sm">
           <form onSubmit={handleSubmit(onAdd)} className="space-y-3">
-            <div className="grid grid-cols-3 gap-3">
-              <div className="col-span-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="sm:col-span-3">
                 <GlassInput label="Product URL" placeholder="https://..." error={errors.productUrl?.message} {...register("productUrl")} />
               </div>
               <GlassInput

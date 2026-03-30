@@ -175,6 +175,8 @@ html {
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 body {
@@ -187,6 +189,7 @@ body {
   font-family: var(--font-geist-sans), system-ui, sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
+  max-width: 100%;
   position: relative;
   transition: background-color 0.35s ease, color 0.35s ease;
 }
@@ -224,6 +227,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
+
+.scrollbar-none::-webkit-scrollbar { display: none; }
+.scrollbar-none { -ms-overflow-style: none; scrollbar-width: none; }
 
 :focus-visible {
   outline: 2px solid var(--accent-border);
@@ -289,6 +295,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .mobile-safe-bottom {
   padding-bottom: calc(env(safe-area-inset-bottom) + 0.75rem);
+}
+
+/* ─── PWA / iOS horizontal scroll prevention ──────────────────── */
+@supports (-webkit-touch-callout: none) {
+  html, body {
+    max-width: 100%;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent fixed/absolute positioned elements from causing overflow */
+  .fixed,
+  [data-radix-popper-content-wrapper],
+  [role="dialog"] {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
 }
 
 /* ─── FONT SIZE ────────────────────────────────────────────────── */

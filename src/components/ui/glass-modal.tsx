@@ -30,7 +30,7 @@ export function GlassModal({
         <Dialog.Content
           className={cn(
             "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
-            "w-[calc(100vw-1.5rem)] max-h-[85vh] overflow-y-auto rounded-[28px]",
+            "w-[calc(100%-1.5rem)] max-h-[85vh] overflow-y-auto overflow-x-hidden rounded-[28px]",
             "bg-panel backdrop-blur-3xl",
             "border border-line",
             "shadow-[var(--shadow-card-hover)]",

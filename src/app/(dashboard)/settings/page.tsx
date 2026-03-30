@@ -168,7 +168,7 @@ function GeneralPanel() {
           <GlassInput label="Phone"                                         {...register("phone")} />
           <GlassTextarea label="Address"                                    {...register("address")} />
           <GlassInput label="Logo URL" placeholder="https://…"  error={errors.logoUrl?.message} {...register("logoUrl")} />
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <GlassInput label="Customer ID Prefix" placeholder="CUST" error={errors.customerIdPrefix?.message} {...register("customerIdPrefix")} />
             <GlassInput label="Order ID Prefix"    placeholder="ORD"  error={errors.orderIdPrefix?.message}    {...register("orderIdPrefix")} />
           </div>
@@ -180,7 +180,7 @@ function GeneralPanel() {
 
       {/* Currency – localStorage only */}
       <SectionDivider title="Currency Settings" />
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <GlassInput
           label="Currency Code"
           value={currency.currencyCode}
@@ -262,7 +262,7 @@ function AppearancePanel() {
 
       <SectionDivider title="Font Size" />
       <p className="mb-4 text-xs text-t3">Adjust the application text size</p>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {FONT_SIZES.map((fs) => (
           <button
             key={fs.value}
@@ -758,13 +758,46 @@ function PlaceholderPanel({ title, description }: { title: string; description: 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("general");
 
+  const activeNav = NAV_ITEMS.find((n) => n.id === tab);
+
+  const TAB_DESCRIPTIONS: Record<Tab, string> = {
+    general:    "Configure basic shop preferences",
+    account:    "Manage your account credentials",
+    appearance: "Customize the look and feel",
+    data:       "Import, export and manage your data",
+    sync:       "Sync settings across devices",
+    trash:      "View and manage deleted records",
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <PageHeader title="Settings" description="Manage your application preferences" />
 
+      {/* ── Mobile: horizontal scrollable tabs ── */}
+      <div className="lg:hidden">
+        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
+          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTab(id)}
+              className={cn(
+                "flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all duration-150",
+                tab === id
+                  ? "bg-accent text-white shadow-[0_2px_12px_var(--accent-shadow)]"
+                  : "border border-line bg-surface text-t2 hover:text-t1",
+              )}
+            >
+              <Icon className={cn("h-4 w-4 shrink-0", tab === id ? "text-white" : "text-t3")} />
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="flex gap-5 items-start">
-        {/* Sidebar nav */}
-        <nav className="w-52 shrink-0 rounded-2xl border border-line bg-surface p-2 backdrop-blur-xl">
+        {/* ── Desktop: sidebar nav ── */}
+        <nav className="hidden lg:block w-52 shrink-0 sticky top-24 rounded-2xl border border-line bg-surface p-2 backdrop-blur-xl">
           {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -783,19 +816,14 @@ export default function SettingsPage() {
           ))}
         </nav>
 
-        {/* Content panel */}
-        <div className="flex-1 min-w-0 rounded-2xl border border-line bg-surface p-6 backdrop-blur-xl">
+        {/* ── Content panel ── */}
+        <div className="flex-1 min-w-0 rounded-2xl border border-line bg-surface p-4 sm:p-6 backdrop-blur-xl">
           <div className="mb-1">
             <h2 className="text-base font-semibold text-t1">
-              {NAV_ITEMS.find((n) => n.id === tab)?.label}
+              {activeNav?.label}
             </h2>
             <p className="text-xs text-t3">
-              {tab === "general"    && "Configure basic shop preferences"}
-              {tab === "account"    && "Manage your account credentials"}
-              {tab === "appearance" && "Customize the look and feel"}
-              {tab === "data"       && "Import, export and manage your data"}
-              {tab === "sync"       && "Sync settings across devices"}
-              {tab === "trash"      && "View and manage deleted records"}
+              {TAB_DESCRIPTIONS[tab]}
             </p>
           </div>
 

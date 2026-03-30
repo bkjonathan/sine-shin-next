@@ -359,7 +359,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
           title={order.orderId}
           description={`Created ${formatDate(order.createdAt)}`}
           actions={
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <OrderStatusBadge status={order.status} />
               <GlassButton variant="ghost" size="sm" onClick={handlePrint}>
                 <Printer className="h-3.5 w-3.5" />
@@ -377,8 +377,8 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
       </div>
 
       {/* ── Status Timeline (clickable) ─────────────────────────────────── */}
-      <GlassCard>
-        <div className="flex items-center justify-between">
+      <GlassCard className="overflow-x-auto">
+        <div className="flex items-center justify-between min-w-[540px]">
           {statusSteps.map((step, i) => {
             const isCompleted = !isCancelled && i <= statusIndex;
             const isCurrent = !isCancelled && i === statusIndex;
@@ -438,7 +438,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
       </GlassCard>
 
       {/* ── Financial Summary Cards ─────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 sm:grid-cols-4">
         <GlassCard padding="sm" hover>
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[rgba(50,184,255,0.12)] text-info">
@@ -537,7 +537,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             {/* Fees — each amount is inline editable, toggles for paid/shop */}
             <div className="space-y-3">
               {feeRows.map((fee) => (
-                <div key={fee.key} className="flex items-center justify-between text-sm">
+                <div key={fee.key} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                   <div className="flex items-center gap-2">
                     <span className="text-t3">{fee.label}</span>
                     <div className="flex gap-1">

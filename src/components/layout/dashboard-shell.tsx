@@ -27,7 +27,7 @@ export function DashboardShell({ children, settings }: DashboardShellProps) {
         onMobileOpenChange={setMobileNavOpen}
       />
 
-      <div className="relative flex min-h-screen flex-col lg:ml-[19rem]">
+      <div className="relative flex min-h-screen flex-col overflow-x-hidden lg:ml-[19rem]">
         <Topbar settings={settings} onMenuClick={() => setMobileNavOpen(true)} />
         <main className="flex-1 px-4 pb-28 pt-4 sm:px-6 lg:px-8 lg:pb-8 lg:pt-6">
           <div className="mx-auto w-full max-w-[1480px] animate-fade-up">

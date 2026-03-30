@@ -70,7 +70,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
         <h3 className="text-sm font-semibold text-t1 mb-1">Basic Information</h3>
         <hr className="border-accent mb-4" />
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <CustomerCombobox
             label="Customer *"
             value={watch("customerId")}
@@ -92,7 +92,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mt-4">
+        <div className="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2">
           <GlassInput
             label="Exchange Rate"
             type="number"
@@ -145,7 +145,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
                   </button>
                 )}
               </div>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <GlassInput
                   label="Qty"
                   type="number"
@@ -178,7 +178,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
         <h3 className="text-sm font-semibold text-t1 mb-1">Fees</h3>
         <hr className="border-line mb-4" />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* Service Fee with type toggle */}
           <div className="w-full">
             <label className="mb-1.5 block text-sm font-medium text-t2">Service Fee</label>
@@ -226,7 +226,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mt-4">
+        <div className="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-3">
           {/* Shipping Fee */}
           <div>
             <GlassInput

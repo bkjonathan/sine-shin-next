@@ -185,7 +185,7 @@ export default function AccountPage() {
           {/* Net balance breakdown */}
           <GlassCard className="md:col-span-2">
             <h3 className="text-sm font-semibold text-t1 mb-4">Balance Breakdown</h3>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               {[
                 { label: "Total Income",   value: v(summary?.total_income),   color: "text-success", icon: TrendingUp   },
                 { label: "Total Expenses", value: v(summary?.total_expenses),  color: "text-danger", icon: TrendingDown },
