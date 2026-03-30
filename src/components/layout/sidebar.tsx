@@ -14,6 +14,7 @@ import {
   X,
   Sparkles,
   UserCog,
+  BarChart3,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ShopSettings } from "@/types";
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/orders", label: "Orders", icon: ShoppingCart },
   { href: "/expenses", label: "Expenses", icon: Receipt },
+  { href: "/reports", label: "Reports", icon: BarChart3, ownerOnly: true },
   { href: "/users", label: "Users", icon: UserCog, ownerOnly: true },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
