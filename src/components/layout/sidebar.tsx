@@ -15,6 +15,7 @@ import {
   Sparkles,
   UserCog,
   BarChart3,
+  Calculator,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ShopSettings } from "@/types";
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/reports", label: "Reports", icon: BarChart3, ownerOnly: true },
   { href: "/users", label: "Users", icon: UserCog, ownerOnly: true },
+  { href: "/calculator", label: "Calculator", icon: Calculator },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -224,7 +226,7 @@ export function Sidebar({
       <nav className="mobile-safe-bottom fixed inset-x-3 bottom-3 z-30 lg:hidden">
         <div className="mx-auto flex max-w-xl items-center justify-between gap-1 rounded-[24px] border border-line bg-sidebar px-2 py-2 shadow-[var(--shadow-card)] backdrop-blur-2xl">
           {filteredNavItems
-            .filter((item) => item.href !== "/users")
+            .filter((item) => item.href !== "/users" && item.href !== "/settings")
             .map(({ href, label, icon }) => {
             const isActive =
               pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
