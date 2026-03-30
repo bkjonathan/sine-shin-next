@@ -14,6 +14,7 @@ interface Row {
   name: string;
   price: string;
   qty: string;
+  feeOverride: string; // user-typed %, empty = auto
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -24,15 +25,11 @@ function getServiceFeeRate(price: number): number {
   return 0.05;
 }
 
-function feePct(price: number): string {
-  return `${getServiceFeeRate(price) * 100}%`;
-}
 
-function calcRow(price: number, qty: number, exchangeRate: number) {
-  const fee = getServiceFeeRate(price);
-  const priceWithFee = price * (1 + fee);
+function calcRow(price: number, qty: number, exchangeRate: number, feeRate: number) {
+  const priceWithFee = price * (1 + feeRate);
   const final = priceWithFee * qty * exchangeRate;
-  return { fee, priceWithFee, final };
+  return { priceWithFee, final };
 }
 
 function fmt(n: number, decimals = 2): string {
@@ -43,7 +40,7 @@ function fmt(n: number, decimals = 2): string {
 }
 
 function newRow(): Row {
-  return { id: crypto.randomUUID(), name: "", price: "", qty: "1" };
+  return { id: crypto.randomUUID(), name: "", price: "", qty: "1", feeOverride: "" };
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -117,7 +114,7 @@ function MobileRowCard({
 }: {
   row: Row;
   index: number;
-  computed: ReturnType<typeof calcRow> & { valid: boolean; price: number; qty: number };
+  computed: ReturnType<typeof calcRow> & { valid: boolean; price: number; qty: number; feeRate: number };
   canDelete: boolean;
   onUpdate: (field: keyof Row, value: string) => void;
   onRemove: () => void;
@@ -175,8 +172,14 @@ function MobileRowCard({
       {computed.valid && (
         <div className="grid grid-cols-3 gap-2">
           <div className="flex flex-col gap-1">
-            <SectionLabel>Fee</SectionLabel>
-            <ReadonlyCell value={feePct(computed.price)} />
+            <SectionLabel>Fee %</SectionLabel>
+            <InlineInput
+              value={row.feeOverride !== "" ? row.feeOverride : String(computed.feeRate * 100)}
+              onChange={(v) => onUpdate("feeOverride", v)}
+              type="number"
+              inputMode="decimal"
+              align="right"
+            />
           </div>
           <div className="flex flex-col gap-1">
             <SectionLabel>w/ Fee</SectionLabel>
@@ -217,10 +220,14 @@ export default function PriceCalculator() {
     const price = parseFloat(r.price);
     const qty = parseInt(r.qty, 10);
     if (isNaN(price) || isNaN(qty) || price <= 0 || qty <= 0) {
-      return { ...r, price, qty, fee: 0, priceWithFee: 0, final: 0, valid: false };
+      return { ...r, price, qty, feeRate: 0, priceWithFee: 0, final: 0, valid: false };
     }
-    const { fee, priceWithFee, final } = calcRow(price, qty, exchangeRate);
-    return { ...r, price, qty, fee, priceWithFee, final, valid: true };
+    const parsedOverride = parseFloat(r.feeOverride);
+    const feeRate = !isNaN(parsedOverride) && r.feeOverride.trim() !== ""
+      ? parsedOverride / 100
+      : getServiceFeeRate(price);
+    const { priceWithFee, final } = calcRow(price, qty, exchangeRate, feeRate);
+    return { ...r, price, qty, feeRate, priceWithFee, final, valid: true };
   });
 
   const grandTotal = computedRows.reduce((sum, r) => sum + (r.valid ? r.final : 0), 0);
@@ -232,7 +239,7 @@ export default function PriceCalculator() {
     const lines = computedRows
       .filter((r) => r.valid)
       .map((r) => {
-        const feePctStr = `+${(r.fee * 100).toFixed(0)}%`;
+        const feePctStr = `+${(r.feeRate * 100).toFixed(0)}%`;
         const label = r.name.trim() || "Item";
         return `${label}: ${fmt(r.price)} ${feePctStr} = ${fmt(r.priceWithFee)} × ${r.qty} × ${exchangeRate} = ${sym}${fmt(r.final)}`;
       });
@@ -352,7 +359,14 @@ export default function PriceCalculator() {
                   inputMode="numeric"
                   align="right"
                 />
-                <ReadonlyCell value={c.valid ? feePct(c.price) : "—"} dim={!c.valid} />
+                <InlineInput
+                  value={c.valid ? (row.feeOverride !== "" ? row.feeOverride : String(c.feeRate * 100)) : ""}
+                  onChange={(v) => updateRow(row.id, "feeOverride", v)}
+                  placeholder="—"
+                  type="number"
+                  inputMode="decimal"
+                  align="right"
+                />
                 <ReadonlyCell value={c.valid ? fmt(c.priceWithFee) : "—"} dim={!c.valid} />
                 <ReadonlyCell
                   value={c.valid ? `${sym}${fmt(c.final)}` : "—"}
@@ -414,7 +428,7 @@ export default function PriceCalculator() {
               .filter((r) => r.valid)
               .map((r) => {
                 const label = r.name.trim() || "Item";
-                const feePctStr = `+${(r.fee * 100).toFixed(0)}%`;
+                const feePctStr = `+${(r.feeRate * 100).toFixed(0)}%`;
                 return `${label}: ${fmt(r.price)} ${feePctStr} = ${fmt(r.priceWithFee)} × ${r.qty} × ${exchangeRate} = ${sym}${fmt(r.final)}`;
               })
               .concat(validCount > 1 ? [`Total: ${sym}${fmt(grandTotal)}`] : [])
