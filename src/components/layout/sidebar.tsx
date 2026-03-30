@@ -223,7 +223,9 @@ export function Sidebar({
 
       <nav className="mobile-safe-bottom fixed inset-x-3 bottom-3 z-30 lg:hidden">
         <div className="mx-auto flex max-w-xl items-center justify-between gap-1 rounded-[24px] border border-line bg-sidebar px-2 py-2 shadow-[var(--shadow-card)] backdrop-blur-2xl">
-          {filteredNavItems.map(({ href, label, icon }) => {
+          {filteredNavItems
+            .filter((item) => item.href !== "/users")
+            .map(({ href, label, icon }) => {
             const isActive =
               pathname === href || (href !== "/dashboard" && pathname.startsWith(href));
             return (

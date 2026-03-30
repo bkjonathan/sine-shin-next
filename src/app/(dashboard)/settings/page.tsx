@@ -23,10 +23,11 @@ import { GlassTextarea } from "@/components/ui/glass-textarea";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { PageHeader } from "@/components/layout/page-header";
+import UsersPage from "@/app/(dashboard)/users/page";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = "general" | "account" | "appearance" | "data" | "sync" | "trash";
+type Tab = "general" | "account" | "appearance" | "users" | "data" | "sync" | "trash";
 type TrashType = "all" | "customers" | "orders" | "expenses";
 
 interface NavItem {
@@ -39,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "general",    label: "General",          icon: Settings  },
   { id: "account",    label: "Account Settings", icon: User      },
   { id: "appearance", label: "Appearance",        icon: Palette   },
+  { id: "users",      label: "Users",             icon: Users     },
   { id: "data",       label: "Data",              icon: Database  },
   { id: "sync",       label: "Sync",              icon: Cloud     },
   { id: "trash",      label: "Trash",             icon: Trash2    },
@@ -764,6 +766,7 @@ export default function SettingsPage() {
     general:    "Configure basic shop preferences",
     account:    "Manage your account credentials",
     appearance: "Customize the look and feel",
+    users:      "Manage team members and their access roles",
     data:       "Import, export and manage your data",
     sync:       "Sync settings across devices",
     trash:      "View and manage deleted records",
@@ -818,19 +821,22 @@ export default function SettingsPage() {
 
         {/* ── Content panel ── */}
         <div className="flex-1 min-w-0 rounded-2xl border border-line bg-surface p-4 sm:p-6 backdrop-blur-xl">
-          <div className="mb-1">
-            <h2 className="text-base font-semibold text-t1">
-              {activeNav?.label}
-            </h2>
-            <p className="text-xs text-t3">
-              {TAB_DESCRIPTIONS[tab]}
-            </p>
-          </div>
+          {tab !== "users" && (
+            <div className="mb-1">
+              <h2 className="text-base font-semibold text-t1">
+                {activeNav?.label}
+              </h2>
+              <p className="text-xs text-t3">
+                {TAB_DESCRIPTIONS[tab]}
+              </p>
+            </div>
+          )}
 
-          <div className="mt-2">
+          <div className={cn(tab !== "users" ? "mt-2" : "mt-0")}>
             {tab === "general"    && <GeneralPanel />}
             {tab === "account"    && <AccountPanel />}
             {tab === "appearance" && <AppearancePanel />}
+            {tab === "users"      && <UsersPage />}
             {tab === "data"       && <PlaceholderPanel title="Data Management" description="Export and import features coming soon." />}
             {tab === "sync"       && <PlaceholderPanel title="Sync" description="Cloud sync features coming soon." />}
             {tab === "trash"      && <TrashPanel />}
