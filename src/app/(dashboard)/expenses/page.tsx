@@ -12,6 +12,7 @@ import { ExpenseForm } from "@/components/expenses/expense-form";
 import { formatCurrency } from "@/lib/utils";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { Plus, Download, Upload, ArrowUp, ArrowDown, LayoutGrid, List } from "lucide-react";
+import { cn } from "@/lib/utils";
 import type { CreateExpenseInput } from "@/validations/expense.schema";
 import { EXPENSE_CATEGORIES } from "@/validations/expense.schema";
 import type { Expense } from "@/types";
@@ -49,7 +50,9 @@ export default function ExpensesPage() {
   const [limit, setLimit] = useState(10);
   const [sort, setSort] = useState("date");
   const [order, setOrder] = useState<SortOrder>("desc");
-  const [view, setView] = useState<"table" | "grid">("table");
+  const [view, setView] = useState<"table" | "grid">(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "grid" : "table"
+  );
   const [creating, setCreating] = useState(false);
   const createExpense = useCreateExpense();
   const { prefs } = useCurrencyPrefs();
@@ -106,22 +109,6 @@ export default function ExpensesPage() {
         description="Manage your business expenses"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <GlassButton
-              variant={view === "grid" ? "primary" : "secondary"}
-              size="sm"
-              onClick={() => setView("grid")}
-              aria-label="Grid view"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </GlassButton>
-            <GlassButton
-              variant={view === "table" ? "primary" : "secondary"}
-              size="sm"
-              onClick={() => setView("table")}
-              aria-label="Table view"
-            >
-              <List className="h-4 w-4" />
-            </GlassButton>
             <GlassButton variant="secondary" size="sm">
               <Upload className="h-4 w-4" /> Import CSV
             </GlassButton>
@@ -161,10 +148,17 @@ export default function ExpensesPage() {
         </div>
       </div>
 
-      {/* Toolbar card */}
-      <div className="rounded-2xl border border-line bg-surface p-4 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex-1 min-w-48 relative">
+      {/* Toolbar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="w-32 shrink-0">
+            <GlassSelect
+              value={searchField}
+              onValueChange={(v) => { setSearchField(v); setPage(1); }}
+              options={SEARCH_FIELD_OPTIONS}
+            />
+          </div>
+          <div className="flex-1 relative">
             <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-t3">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
@@ -177,14 +171,12 @@ export default function ExpensesPage() {
               className="pl-10"
             />
           </div>
-          <div className="w-44">
-            <GlassSelect
-              value={searchField}
-              onValueChange={(v) => { setSearchField(v); setPage(1); }}
-              options={SEARCH_FIELD_OPTIONS}
-            />
+        </div>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="w-36 shrink-0">
+            <GlassSelect value={category} onValueChange={handleCategory} options={categoryOptions} />
           </div>
-          <div className="w-44">
+          <div className="w-36 shrink-0">
             <GlassSelect value={sort} onValueChange={handleSort} options={SORT_OPTIONS} />
           </div>
           <GlassButton
@@ -195,13 +187,28 @@ export default function ExpensesPage() {
           >
             {order === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
           </GlassButton>
-        </div>
-        <div className="w-56">
-          <GlassSelect
-            value={category}
-            onValueChange={handleCategory}
-            options={categoryOptions}
-          />
+          <div className="flex items-center rounded-xl border border-line bg-surface p-0.5">
+            <button
+              onClick={() => setView("grid")}
+              aria-label="Grid view"
+              className={cn(
+                "flex items-center justify-center rounded-lg p-1.5 transition-all",
+                view === "grid" ? "bg-accent text-white shadow-sm" : "text-t3 hover:text-t1"
+              )}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setView("table")}
+              aria-label="Table view"
+              className={cn(
+                "flex items-center justify-center rounded-lg p-1.5 transition-all",
+                view === "table" ? "bg-accent text-white shadow-sm" : "text-t3 hover:text-t1"
+              )}
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 

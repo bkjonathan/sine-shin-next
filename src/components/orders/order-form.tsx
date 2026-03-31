@@ -44,7 +44,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
       deliveryFee: defaultValues?.deliveryFee ?? 0,
       cargoFee: defaultValues?.cargoFee ?? 0,
       serviceFee: defaultValues?.serviceFee ?? 0,
-      serviceFeeType: defaultValues?.serviceFeeType ?? "%",
+      serviceFeeType: defaultValues?.serviceFeeType ?? "percent",
       productDiscount: defaultValues?.productDiscount ?? 0,
       shippingFeeByShop: defaultValues?.shippingFeeByShop ?? false,
       deliveryFeeByShop: defaultValues?.deliveryFeeByShop ?? false,
@@ -201,7 +201,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
                 type="button"
                 onClick={() => {
                   const current = watch("serviceFeeType");
-                  setValue("serviceFeeType", current === "%" ? "fixed" : "%");
+                  setValue("serviceFeeType", current === "percent" ? "fixed" : "percent");
                 }}
                 className={cn(
                   "shrink-0 rounded-2xl px-4 py-3 text-sm font-medium",
@@ -209,7 +209,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
                   "hover:bg-surface-hover transition-colors"
                 )}
               >
-                {watch("serviceFeeType") === "%" ? "%" : prefs.currencySymbol}
+                {watch("serviceFeeType") === "percent" ? "%" : prefs.currencySymbol}
               </button>
             </div>
             {errors.serviceFee && <p className="mt-1.5 text-xs text-danger">{errors.serviceFee.message}</p>}

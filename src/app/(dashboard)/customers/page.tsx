@@ -13,6 +13,7 @@ import { Plus, Download, Upload, Printer, ArrowUp, ArrowDown, LayoutGrid, List }
 import type { CreateCustomerInput } from "@/validations/customer.schema";
 import type { Customer } from "@/types";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 type SortOrder = "asc" | "desc";
 
@@ -41,7 +42,9 @@ export default function CustomersPage() {
   const [limit, setLimit] = useState(10);
   const [sort, setSort] = useState("customerId");
   const [order, setOrder] = useState<SortOrder>("desc");
-  const [view, setView] = useState<"table" | "grid">("table");
+  const [view, setView] = useState<"table" | "grid">(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "grid" : "table"
+  );
   const [creating, setCreating] = useState(false);
   const createCustomer = useCreateCustomer();
 
@@ -110,34 +113,32 @@ export default function CustomersPage() {
       />
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="w-40">
-          <GlassSelect
-            value={searchField}
-            onValueChange={(v) => { setSearchField(v); setPage(1); }}
-            options={SEARCH_FIELD_OPTIONS}
-          />
-        </div>
-        <div className="flex-1 min-w-48 relative">
-          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-t3">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-          </span>
-          <GlassInput
-            placeholder="Search customers..."
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="w-44">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="w-36 shrink-0">
             <GlassSelect
-              value={sort}
-              onValueChange={handleSort}
-              options={SORT_OPTIONS}
+              value={searchField}
+              onValueChange={(v) => { setSearchField(v); setPage(1); }}
+              options={SEARCH_FIELD_OPTIONS}
             />
+          </div>
+          <div className="flex-1 relative">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-t3">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              </svg>
+            </span>
+            <GlassInput
+              placeholder="Search customers..."
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+        </div>
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="w-40 shrink-0">
+            <GlassSelect value={sort} onValueChange={handleSort} options={SORT_OPTIONS} />
           </div>
           <GlassButton
             variant="secondary"
@@ -147,22 +148,28 @@ export default function CustomersPage() {
           >
             {order === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
           </GlassButton>
-          <GlassButton
-            variant={view === "grid" ? "primary" : "secondary"}
-            size="sm"
-            onClick={() => setView("grid")}
-            aria-label="Grid view"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </GlassButton>
-          <GlassButton
-            variant={view === "table" ? "primary" : "secondary"}
-            size="sm"
-            onClick={() => setView("table")}
-            aria-label="Table view"
-          >
-            <List className="h-4 w-4" />
-          </GlassButton>
+          <div className="flex items-center rounded-xl border border-line bg-surface p-0.5">
+            <button
+              onClick={() => setView("grid")}
+              aria-label="Grid view"
+              className={cn(
+                "flex items-center justify-center rounded-lg p-1.5 transition-all",
+                view === "grid" ? "bg-accent text-white shadow-sm" : "text-t3 hover:text-t1"
+              )}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setView("table")}
+              aria-label="Table view"
+              className={cn(
+                "flex items-center justify-center rounded-lg p-1.5 transition-all",
+                view === "table" ? "bg-accent text-white shadow-sm" : "text-t3 hover:text-t1"
+              )}
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -239,7 +246,7 @@ function CustomerGrid({ customers, isLoading }: { customers: Customer[]; isLoadi
         <Link
           key={c.id}
           href={`/customers/${c.id}`}
-          className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 transition-colors hover:bg-surface-hover"
+          className="group flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 transition-all hover:border-accent/40 hover:shadow-md hover:shadow-black/5 active:scale-[0.99]"
         >
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent/15 text-sm font-semibold text-accent">
@@ -247,7 +254,7 @@ function CustomerGrid({ customers, isLoading }: { customers: Customer[]; isLoadi
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-t1">{c.name}</p>
-              <p className="text-xs text-t3">{c.customerId}</p>
+              <p className="font-mono text-xs text-t3">{c.customerId}</p>
             </div>
           </div>
           <div className="space-y-1 text-xs text-t2">

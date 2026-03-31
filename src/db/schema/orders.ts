@@ -13,7 +13,7 @@ export const orders = pgTable("orders", {
   cargoFee: doublePrecision("cargo_fee").notNull().default(0),
   serviceFee: doublePrecision("service_fee").notNull().default(0),
   productDiscount: doublePrecision("product_discount"),
-  serviceFeeType: text("service_fee_type"),
+  serviceFeeType: text("service_fee_type").notNull().default("percent"),
   shippingFeePaid: boolean("shipping_fee_paid"),
   deliveryFeePaid: boolean("delivery_fee_paid"),
   cargoFeePaid: boolean("cargo_fee_paid"),

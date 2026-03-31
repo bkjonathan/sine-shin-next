@@ -257,7 +257,8 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
 
   const customerFees = feesTotal - shopAbsorbedFees;
   // grandTotal stays in primary currency ($); exchange rate is applied only at display time
-  const grandTotal = itemsSubtotal - discount + customerFees;
+  // productDiscount is our internal profit, not a customer-facing deduction
+  const grandTotal = itemsSubtotal + customerFees;
   const grandTotalInExchangeCurrency = grandTotal * order.exchangeRate;
 
   // ── Status timeline ─────────────────────────────────────────────────
@@ -473,7 +474,6 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-t4">Grand Total</p>
               <p className="text-lg font-bold text-t1">{formatCurrency(grandTotal, prefs.currencySymbol)}</p>
-              {discount > 0 && <p className="text-[10px] text-danger">-{formatCurrency(discount, prefs.currencySymbol)} disc.</p>}
             </div>
           </div>
         </GlassCard>
@@ -517,13 +517,10 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                 <span className="font-medium text-t1">{formatCurrency(itemsSubtotal, prefs.currencySymbol)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-t3 flex items-center gap-1.5">
-                  Product Discount
-                  {discount > 0 && <span className="text-danger">(-)</span>}
-                </span>
+                <span className="text-t3">Product Discount</span>
                 <InlineText
                   value={discount}
-                  displayValue={<span className={cn("font-medium", discount > 0 ? "text-danger" : "text-t1")}>{discount > 0 ? `-${formatCurrency(discount, prefs.currencySymbol)}` : formatCurrency(0, prefs.currencySymbol)}</span>}
+                  displayValue={<span className="font-medium text-t1">{formatCurrency(discount, prefs.currencySymbol)}</span>}
                   type="number"
                   step="0.01"
                   min="0"
@@ -599,7 +596,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-t3">Subtotal (items + fees)</span>
-                <span className="font-medium text-t1">{formatCurrency(itemsSubtotal - discount + feesTotal, prefs.currencySymbol)}</span>
+                <span className="font-medium text-t1">{formatCurrency(itemsSubtotal + feesTotal, prefs.currencySymbol)}</span>
               </div>
               {shopAbsorbedFees > 0 && (
                 <div className="flex justify-between text-sm">
@@ -616,10 +613,10 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                   <span className="text-xl font-bold text-accent">{formatCurrency(grandTotal, prefs.currencySymbol)}</span>
                 </div>
               </div>
-              {serviceFeeAmount > 0 && (
+              {(serviceFeeAmount > 0 || discount > 0) && (
                 <div className="flex items-center justify-between px-1">
                   <span className="text-sm font-semibold text-t2">Profit</span>
-                  <span className="text-lg font-bold text-success">{formatCurrency(serviceFeeAmount, prefs.currencySymbol)}</span>
+                  <span className="text-lg font-bold text-success">{formatCurrency(serviceFeeAmount + discount, prefs.currencySymbol)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between px-1">

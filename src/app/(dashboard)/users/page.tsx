@@ -19,8 +19,15 @@ import {
   UserCog,
   User,
   Users,
+  LayoutGrid,
+  List,
+  Pencil,
+  Trash2,
 } from "lucide-react";
-import type { CreateUserInput } from "@/validations/user.schema";
+import type { CreateUserInput, UpdateUserInput } from "@/validations/user.schema";
+import { useUpdateUser, useDeleteUser } from "@/hooks/use-users";
+import { GlassBadge } from "@/components/ui/glass-badge";
+import { cn } from "@/lib/utils";
 
 type SortOrder = "asc" | "desc";
 
@@ -43,6 +50,9 @@ export default function UsersPage() {
   const [limit, setLimit] = useState(10);
   const [sort, setSort] = useState("createdAt");
   const [order, setOrder] = useState<SortOrder>("desc");
+  const [view, setView] = useState<"table" | "grid">(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "grid" : "table"
+  );
   const [creating, setCreating] = useState(false);
   const createUser = useCreateUser();
 
@@ -135,8 +145,8 @@ export default function UsersPage() {
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-48 relative">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="flex-1 relative">
           <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-t3">
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <circle cx="11" cy="11" r="8" />
@@ -150,13 +160,9 @@ export default function UsersPage() {
             className="pl-10"
           />
         </div>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="w-44">
-            <GlassSelect
-              value={sort}
-              onValueChange={handleSort}
-              options={SORT_OPTIONS}
-            />
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="w-44 shrink-0">
+            <GlassSelect value={sort} onValueChange={handleSort} options={SORT_OPTIONS} />
           </div>
           <GlassButton
             variant="secondary"
@@ -166,15 +172,45 @@ export default function UsersPage() {
           >
             {order === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
           </GlassButton>
+          <div className="flex items-center rounded-xl border border-line bg-surface p-0.5">
+            <button
+              onClick={() => setView("grid")}
+              aria-label="Grid view"
+              className={cn(
+                "flex items-center justify-center rounded-lg p-1.5 transition-all",
+                view === "grid" ? "bg-accent text-white shadow-sm" : "text-t3 hover:text-t1"
+              )}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setView("table")}
+              aria-label="Table view"
+              className={cn(
+                "flex items-center justify-center rounded-lg p-1.5 transition-all",
+                view === "table" ? "bg-accent text-white shadow-sm" : "text-t3 hover:text-t1"
+              )}
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <UserTable
-        users={allUsers}
-        isLoading={isLoading}
-        pageOffset={pageOffset}
-        currentUserId={session?.user?.id}
-      />
+      {view === "table" ? (
+        <UserTable
+          users={allUsers}
+          isLoading={isLoading}
+          pageOffset={pageOffset}
+          currentUserId={session?.user?.id}
+        />
+      ) : (
+        <UserGrid
+          users={allUsers}
+          isLoading={isLoading}
+          currentUserId={session?.user?.id}
+        />
+      )}
 
       {/* Pagination */}
       <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-line bg-surface px-5 py-3.5">
@@ -236,5 +272,114 @@ export default function UsersPage() {
         />
       </GlassModal>
     </div>
+  );
+}
+
+interface UserListItem {
+  id: string;
+  username: string;
+  role: string;
+  createdAt: string;
+}
+
+const ROLE_CONFIG: Record<string, { label: string; bgClass: string; icon: typeof Shield }> = {
+  owner: { label: "Owner", bgClass: "bg-accent/15 text-accent", icon: Shield },
+  manager: { label: "Manager", bgClass: "bg-info/15 text-info", icon: UserCog },
+  staff: { label: "Staff", bgClass: "bg-surface-hover text-t2", icon: User },
+};
+
+function UserGrid({
+  users,
+  isLoading,
+  currentUserId,
+}: {
+  users: UserListItem[];
+  isLoading?: boolean;
+  currentUserId?: string;
+}) {
+  const [editing, setEditing] = useState<UserListItem | null>(null);
+  const updateUser = useUpdateUser();
+  const deleteUser = useDeleteUser();
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="animate-pulse rounded-2xl border border-line bg-surface h-28" />
+        ))}
+      </div>
+    );
+  }
+  if (!users.length) {
+    return <p className="py-12 text-center text-sm text-t3">No users found</p>;
+  }
+  return (
+    <>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {users.map((u) => {
+          const cfg = ROLE_CONFIG[u.role] ?? ROLE_CONFIG.staff;
+          const RoleIcon = cfg.icon;
+          const isSelf = u.id === currentUserId;
+          return (
+            <div
+              key={u.id}
+              className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 transition-all hover:border-accent/30 hover:shadow-md hover:shadow-black/5"
+            >
+              <div className="flex items-center gap-3">
+                <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold", cfg.bgClass)}>
+                  {u.username.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold text-t1">{u.username}</p>
+                  <p className="text-xs text-t3">{new Date(u.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <GlassBadge variant={u.role === "owner" ? "default" : u.role === "manager" ? "info" : "neutral"}>
+                  <RoleIcon className="h-3 w-3" />
+                  {cfg.label}
+                </GlassBadge>
+                <div className="flex items-center gap-1">
+                  <GlassButton
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditing(u)}
+                    aria-label="Edit user"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </GlassButton>
+                  {!isSelf && (
+                    <GlassButton
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => { if (confirm("Delete this user?")) deleteUser.mutate(u.id); }}
+                      className="hover:text-danger"
+                      aria-label="Delete user"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </GlassButton>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {editing && (
+        <GlassModal open={!!editing} onOpenChange={(open) => { if (!open) setEditing(null); }} title="Edit User">
+          <UserForm
+            defaultValues={{ id: editing.id, username: editing.username, role: editing.role }}
+            onSubmit={(d) =>
+              updateUser.mutate(
+                { id: editing.id, ...(d as UpdateUserInput) },
+                { onSuccess: () => setEditing(null) }
+              )
+            }
+            isLoading={updateUser.isPending}
+            onCancel={() => setEditing(null)}
+          />
+        </GlassModal>
+      )}
+    </>
   );
 }

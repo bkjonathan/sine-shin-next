@@ -14,6 +14,7 @@ import type { CreateOrderInput } from "@/validations/order.schema";
 import { ORDER_STATUSES } from "@/validations/order.schema";
 import { cn } from "@/lib/utils";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
+import Link from "next/link";
 
 type SortOrder = "asc" | "desc";
 
@@ -44,7 +45,9 @@ export default function OrdersPage() {
   const [limit, setLimit] = useState(10);
   const [sort, setSort] = useState("createdAt");
   const [order, setOrder] = useState<SortOrder>("desc");
-  const [view, setView] = useState<"table" | "grid">("table");
+  const [view, setView] = useState<"table" | "grid">(() =>
+    typeof window !== "undefined" && window.innerWidth < 768 ? "grid" : "table"
+  );
   const [creating, setCreating] = useState(false);
   const createOrder = useCreateOrder();
   const { prefs } = useCurrencyPrefs();
@@ -116,29 +119,33 @@ export default function OrdersPage() {
       />
 
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="w-44">
-          <GlassSelect
-            value={searchField}
-            onValueChange={(v) => { setSearchField(v); setPage(1); }}
-            options={SEARCH_FIELD_OPTIONS}
-          />
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        {/* Search row */}
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <div className="w-40 shrink-0">
+            <GlassSelect
+              value={searchField}
+              onValueChange={(v) => { setSearchField(v); setPage(1); }}
+              options={SEARCH_FIELD_OPTIONS}
+            />
+          </div>
+          <div className="flex-1 relative">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-t3">
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+              </svg>
+            </span>
+            <GlassInput
+              placeholder="Search orders, customers..."
+              value={search}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
-        <div className="flex-1 min-w-48 relative">
-          <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-t3">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-          </span>
-          <GlassInput
-            placeholder="Search orders, customers..."
-            value={search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        <div className="ml-auto flex items-center gap-2">
-          <div className="w-44">
+        {/* Sort + view toggle row */}
+        <div className="flex items-center gap-2 sm:ml-auto">
+          <div className="w-40 shrink-0">
             <GlassSelect value={sort} onValueChange={handleSort} options={SORT_OPTIONS} />
           </div>
           <GlassButton
@@ -149,22 +156,33 @@ export default function OrdersPage() {
           >
             {order === "asc" ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
           </GlassButton>
-          <GlassButton
-            variant={view === "grid" ? "primary" : "secondary"}
-            size="sm"
-            onClick={() => setView("grid")}
-            aria-label="Grid view"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </GlassButton>
-          <GlassButton
-            variant={view === "table" ? "primary" : "secondary"}
-            size="sm"
-            onClick={() => setView("table")}
-            aria-label="Table view"
-          >
-            <List className="h-4 w-4" />
-          </GlassButton>
+          {/* Segmented view toggle */}
+          <div className="flex items-center rounded-xl border border-line bg-surface p-0.5">
+            <button
+              onClick={() => setView("grid")}
+              aria-label="Grid view"
+              className={cn(
+                "flex items-center justify-center rounded-lg p-1.5 transition-all",
+                view === "grid"
+                  ? "bg-accent text-white shadow-sm"
+                  : "text-t3 hover:text-t1"
+              )}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button
+              onClick={() => setView("table")}
+              aria-label="Table view"
+              className={cn(
+                "flex items-center justify-center rounded-lg p-1.5 transition-all",
+                view === "table"
+                  ? "bg-accent text-white shadow-sm"
+                  : "text-t3 hover:text-t1"
+              )}
+            >
+              <List className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -269,40 +287,45 @@ function OrderGrid({ orders, isLoading }: { orders: OrderRow[]; isLoading?: bool
     return <p className="py-12 text-center text-sm text-t3">No orders found</p>;
   }
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {orders.map((o) => {
         const total = (o.shippingFee ?? 0) + (o.deliveryFee ?? 0) + (o.cargoFee ?? 0) + (o.serviceFee ?? 0);
+        const statusColors: Record<string, string> = {
+          completed: "bg-green-500/15 text-green-400",
+          ordered: "bg-yellow-500/15 text-yellow-400",
+          arrived: "bg-blue-500/15 text-blue-400",
+          shipping: "bg-orange-500/15 text-orange-400",
+          cancelled: "bg-red-500/15 text-red-400",
+          pending: "bg-surface-hover text-t2",
+        };
         return (
-          <div key={o.id} className="flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4">
+          <Link
+            key={o.id}
+            href={`/orders/${o.id}`}
+            className="group flex flex-col gap-3 rounded-2xl border border-line bg-surface p-4 transition-all hover:border-accent/40 hover:shadow-md hover:shadow-black/5 active:scale-[0.99]"
+          >
             <div className="flex items-center justify-between">
-              <span className="inline-flex items-center rounded-lg border border-line bg-surface-hover px-2.5 py-1 font-mono text-xs text-t2">
+              <span className="inline-flex items-center rounded-lg border border-line bg-surface-hover px-2.5 py-1 font-mono text-xs text-t2 group-hover:border-accent/30">
                 {o.orderId}
               </span>
-              <span className={cn(
-                "rounded-full px-2.5 py-0.5 text-xs font-medium",
-                o.status === "completed" ? "bg-green-500/15 text-green-400" :
-                o.status === "ordered" ? "bg-yellow-500/15 text-yellow-400" :
-                o.status === "arrived" ? "bg-blue-500/15 text-blue-400" :
-                o.status === "shipping" ? "bg-yellow-500/15 text-yellow-400" :
-                o.status === "cancelled" ? "bg-red-500/15 text-red-400" :
-                "bg-surface-hover text-t2"
-              )}>
+              <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-medium", statusColors[o.status] ?? "bg-surface-hover text-t2")}>
                 {o.status.charAt(0).toUpperCase() + o.status.slice(1)}
               </span>
             </div>
-            {o.customerName && (
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
-                  {o.customerName.charAt(0).toUpperCase()}
-                </div>
-                <span className="text-sm text-t1">{o.customerName}</span>
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-accent/15 text-xs font-semibold text-accent">
+                {o.customerName ? o.customerName.charAt(0).toUpperCase() : "?"}
               </div>
-            )}
-            <div className="flex items-center justify-between text-xs text-t3">
-              <span>{prefs.currencySymbol} {total.toLocaleString()}</span>
-              <span>{new Date(o.createdAt).toLocaleDateString()}</span>
+              <span className="text-sm font-medium text-t1 truncate">{o.customerName ?? "—"}</span>
             </div>
-          </div>
+            <div className="flex items-center justify-between border-t border-line pt-2.5 text-xs">
+              <span className="font-semibold text-t1">{prefs.currencySymbol} {total.toLocaleString()}</span>
+              <div className="flex items-center gap-3 text-t3">
+                {(o.totalQty ?? 0) > 0 && <span>{o.totalQty} pcs</span>}
+                <span>{new Date(o.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+              </div>
+            </div>
+          </Link>
         );
       })}
     </div>

@@ -26,7 +26,7 @@ export const createOrderSchema = z.object({
   deliveryFee: z.number().min(0),
   cargoFee: z.number().min(0),
   serviceFee: z.number().min(0),
-  serviceFeeType: z.string().optional().nullable(),
+  serviceFeeType: z.preprocess(v => v === "%" ? "percent" : (v == null ? "percent" : v), z.enum(["fixed", "percent"])),
   productDiscount: z.number().min(0).optional().nullable(),
   shippingFeePaid: z.boolean().optional().nullable(),
   deliveryFeePaid: z.boolean().optional().nullable(),

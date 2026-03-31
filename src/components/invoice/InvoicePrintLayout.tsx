@@ -170,12 +170,6 @@ export function InvoicePrintLayout({
             <span>{formatPrice(itemsSubtotal)}</span>
           </div>
 
-          {(order.productDiscount ?? 0) > 0 && (
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#334155", marginBottom: 8 }}>
-              <span>Product Discount</span>
-              <span>{formatPrice(order.productDiscount ?? 0)}</span>
-            </div>
-          )}
           {serviceFeeAmount > 0 && (
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: 14, color: "#334155", marginBottom: 8 }}>
               <span>Service Fee{isPercentFee ? ` (${order.serviceFee}%)` : ""}</span>
