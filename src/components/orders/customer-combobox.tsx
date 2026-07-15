@@ -1,11 +1,15 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Search, ChevronDown, Check, X } from "lucide-react";
+import { Search, ChevronDown, Check, X, Plus } from "lucide-react";
 import * as Popover from "@radix-ui/react-popover";
-import { useCustomers, useCustomer } from "@/hooks/use-customers";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCustomers, useCustomer, useCreateCustomer } from "@/hooks/use-customers";
 import { cn } from "@/lib/utils";
 import { useDebounce } from "@/hooks/use-debounce";
+import { GlassModal } from "@/components/ui/glass-modal";
+import { CustomerForm } from "@/components/customers/customer-form";
+import type { CreateCustomerInput } from "@/validations/customer.schema";
 
 interface CustomerComboboxProps {
   value?: string;
@@ -13,6 +17,7 @@ interface CustomerComboboxProps {
   label?: string;
   error?: string;
   placeholder?: string;
+  allowCreate?: boolean;
 }
 
 export function CustomerCombobox({
@@ -21,11 +26,15 @@ export function CustomerCombobox({
   label,
   error,
   placeholder = "Search customer...",
+  allowCreate = true,
 }: CustomerComboboxProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [creating, setCreating] = useState(false);
   const debouncedSearch = useDebounce(search, 300);
   const inputRef = useRef<HTMLInputElement>(null);
+  const queryClient = useQueryClient();
+  const createCustomer = useCreateCustomer();
 
   const { data: customersData, isLoading } = useCustomers({
     limit: 10,
@@ -60,6 +69,23 @@ export function CustomerCombobox({
     e.stopPropagation();
     onValueChange?.("");
     setSearch("");
+  };
+
+  const handleOpenCreate = () => {
+    setOpen(false);
+    setCreating(true);
+  };
+
+  const handleCreate = (data: CreateCustomerInput) => {
+    createCustomer.mutate(data, {
+      onSuccess: (customer) => {
+        // Seed the cache so the trigger label resolves without waiting for a refetch
+        queryClient.setQueryData(["customers", customer.id], customer);
+        onValueChange?.(customer.id);
+        setSearch("");
+        setCreating(false);
+      },
+    });
   };
 
   return (
@@ -122,7 +148,9 @@ export function CustomerCombobox({
               {isLoading ? (
                 <div className="px-3 py-6 text-center text-sm text-t3">Loading...</div>
               ) : customers.length === 0 ? (
-                <div className="px-3 py-6 text-center text-sm text-t3">No customers found</div>
+                <div className="px-3 py-6 text-center text-sm text-t3">
+                  {search ? `No customers match "${search}"` : "No customers found"}
+                </div>
               ) : (
                 customers.map((customer) => (
                   <button
@@ -148,10 +176,35 @@ export function CustomerCombobox({
                 ))
               )}
             </div>
+            {allowCreate && (
+              <div className="border-t border-line p-1.5">
+                <button
+                  type="button"
+                  onClick={handleOpenCreate}
+                  className="flex w-full cursor-pointer items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-accent outline-none select-none hover:bg-surface-hover"
+                >
+                  <Plus className="h-4 w-4 shrink-0" />
+                  <span className="truncate">
+                    {search ? `Add "${search}" as new customer` : "Add new customer"}
+                  </span>
+                </button>
+              </div>
+            )}
           </Popover.Content>
         </Popover.Portal>
       </Popover.Root>
       {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
+
+      {allowCreate && (
+        <GlassModal open={creating} onOpenChange={setCreating} title="New Customer">
+          <CustomerForm
+            defaultValues={{ name: search }}
+            onSubmit={handleCreate}
+            isLoading={createCustomer.isPending}
+            onCancel={() => setCreating(false)}
+          />
+        </GlassModal>
+      )}
     </div>
   );
 }

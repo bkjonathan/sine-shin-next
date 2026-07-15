@@ -31,7 +31,15 @@ export function CustomerForm({ defaultValues, onSubmit, isLoading, onCancel }: C
   });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <form
+      onSubmit={(e) => {
+        // Portaled into a parent <form> when used inside the order modal; React
+        // bubbles submit through the portal, so keep it from submitting that one.
+        e.stopPropagation();
+        handleSubmit(onSubmit)(e);
+      }}
+      className="space-y-4"
+    >
       <GlassInput
         label="Name *"
         placeholder="John Doe"

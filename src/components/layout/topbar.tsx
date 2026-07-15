@@ -2,10 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { LogOut, User, Menu, CalendarDays } from "lucide-react";
+import { LogOut, User, Menu, CalendarDays, Maximize2, Minimize2 } from "lucide-react";
 import { GlassButton } from "@/components/ui/glass-button";
 import { CommandPalette } from "@/components/layout/command-palette";
 import { ThemeSelector } from "@/components/ui/theme-selector";
+import { useFullscreen } from "@/hooks/use-fullscreen";
 import type { ShopSettings } from "@/types";
 
 interface TopbarProps {
@@ -26,6 +27,7 @@ const SECTION_LABELS: Record<string, string> = {
 export function Topbar({ settings, onMenuClick }: TopbarProps) {
   const { data: session } = useSession();
   const pathname = usePathname();
+  const { isFullscreen, toggle: toggleFullscreen } = useFullscreen();
   const section =
     Object.entries(SECTION_LABELS).find(([prefix]) =>
       pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -67,6 +69,21 @@ export function Topbar({ settings, onMenuClick }: TopbarProps) {
           <div className="hidden md:block">
             <CommandPalette />
           </div>
+
+          <button
+            type="button"
+            onClick={() => void toggleFullscreen()}
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border border-line bg-surface text-t2 transition hover:bg-surface-hover hover:text-t1"
+            title={isFullscreen ? "Exit full screen (F11)" : "Enter full screen (F11)"}
+            aria-label={isFullscreen ? "Exit full screen" : "Enter full screen"}
+            aria-pressed={isFullscreen}
+          >
+            {isFullscreen ? (
+              <Minimize2 className="h-4 w-4" />
+            ) : (
+              <Maximize2 className="h-4 w-4" />
+            )}
+          </button>
 
           <ThemeSelector />
 

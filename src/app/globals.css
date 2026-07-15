@@ -333,6 +333,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 [data-compact="true"] .space-y-4 > * + * { margin-top: 0.5rem; }
 [data-compact="true"] .p-6  { padding: 1rem; }
 
+/* ─── FULL SCREEN FALLBACK ─────────────────────────────────────── */
+/* Only set where the Fullscreen API is missing (iPhone Safari). Browser
+   chrome can't be hidden there, so reclaim what space we can instead. */
+[data-fullscreen="true"] .animate-float-slow,
+[data-fullscreen="true"] .animate-float-reverse,
+[data-fullscreen="true"] .animate-pulse-glow {
+  display: none;
+}
+
+[data-fullscreen="true"] body {
+  min-height: 100dvh;
+}
+
+[data-fullscreen="true"] main {
+  padding-top: 0.5rem;
+  padding-bottom: calc(env(safe-area-inset-bottom) + 0.5rem);
+}
+
 /* ─── PRINT (invoice) ───────────────────────────────────────────── */
 @media print {
   body > * { display: none !important; }
