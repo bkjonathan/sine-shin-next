@@ -65,6 +65,8 @@ interface OrderDetailClientProps {
   shop: ShopSettings | null;
 }
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
 // ── Inline Edit Primitives ───────────────────────────────────────────────────
 
 function InlineText({
@@ -240,6 +242,10 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
   const totalQty = items.reduce((s, i) => s + (i.productQty ?? 0), 0);
   const totalWeight = items.reduce((s, i) => s + (i.productWeight ?? 0), 0);
   const discount = order.productDiscount ?? 0;
+  // Buy price has no column of its own — it is derived from the discount we
+  // store, and editing it writes back the discount it implies.
+  const buyPrice = Math.max(0, round2(itemsSubtotal - discount));
+  const discountMargin = itemsSubtotal > 0 ? Math.round((discount / itemsSubtotal) * 100) : 0;
 
   const shippingFee = order.shippingFee;
   const deliveryFee = order.deliveryFee;
@@ -517,7 +523,26 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                 <span className="font-medium text-t1">{formatCurrency(itemsSubtotal, prefs.currencySymbol)}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-t3">Product Discount</span>
+                <span className="text-t3">Actual Buy Price</span>
+                <InlineText
+                  value={buyPrice}
+                  displayValue={<span className="font-medium text-t1">{formatCurrency(buyPrice, prefs.currencySymbol)}</span>}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  onSave={(v) => {
+                    const bp = parseFloat(v);
+                    save({ productDiscount: Number.isFinite(bp) ? Math.max(0, round2(itemsSubtotal - bp)) : 0 });
+                  }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-t3">
+                  Product Discount
+                  {discount > 0 && itemsSubtotal > 0 && (
+                    <span className="ml-1.5 text-xs text-t4">{discountMargin}% margin</span>
+                  )}
+                </span>
                 <InlineText
                   value={discount}
                   displayValue={<span className="font-medium text-t1">{formatCurrency(discount, prefs.currencySymbol)}</span>}

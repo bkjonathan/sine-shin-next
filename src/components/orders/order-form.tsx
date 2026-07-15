@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -10,7 +10,7 @@ import { GlassInput } from "@/components/ui/glass-input";
 import { GlassSelect } from "@/components/ui/glass-select";
 import { GlassButton } from "@/components/ui/glass-button";
 import { CustomerCombobox } from "@/components/orders/customer-combobox";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import type { Order } from "@/types";
 
@@ -23,6 +23,8 @@ interface OrderFormProps {
 
 const statusOptions = ORDER_STATUSES.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }));
 const orderFromOptions = ORDER_FROM_OPTIONS.map((s) => ({ value: s, label: s }));
+
+const round2 = (n: number) => Math.round(n * 100) / 100;
 
 export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: OrderFormProps) {
   const {
@@ -62,6 +64,51 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
       setValue("exchangeRate", prefs.exchangeRate);
     }
   }, [prefs.exchangeRate]);
+
+  // ── Actual buy price ↔ product discount ──────────────────────────────
+  // Buy price has no column of its own. It is stored implicitly: the discount
+  // we save is (itemsSubtotal - buyPrice), so buy price can always be derived
+  // back as (itemsSubtotal - productDiscount). The draft holds what the user
+  // typed; clearing it re-derives the field from the discount.
+  // Recomputed every render on purpose: watch() hands back the same array
+  // reference each time (RHF mutates it in place), so memoizing on it never
+  // invalidates.
+  const watchedItems = watch("items");
+  const itemsSubtotal = (watchedItems ?? []).reduce(
+    (sum, i) => sum + (Number(i?.price) || 0) * (Number(i?.productQty) || 0),
+    0
+  );
+
+  const [buyPriceDraft, setBuyPriceDraft] = useState<string | null>(null);
+  const discountValue = Number(watch("productDiscount")) || 0;
+  const buyPriceValue =
+    buyPriceDraft ?? (itemsSubtotal > 0 ? String(round2(itemsSubtotal - discountValue)) : "");
+
+  useEffect(() => {
+    if (buyPriceDraft === null || buyPriceDraft.trim() === "") return;
+    const bp = Number(buyPriceDraft);
+    if (!Number.isFinite(bp)) return;
+    setValue("productDiscount", Math.max(0, round2(itemsSubtotal - bp)), { shouldValidate: true });
+  }, [itemsSubtotal]);
+
+  function handleBuyPriceChange(raw: string) {
+    setBuyPriceDraft(raw);
+    const bp = Number(raw);
+    const discount = raw.trim() === "" || !Number.isFinite(bp) ? 0 : Math.max(0, round2(itemsSubtotal - bp));
+    setValue("productDiscount", discount, { shouldValidate: true });
+  }
+
+  const buyPriceNum = Number(buyPriceValue);
+  const buyPriceHint = (() => {
+    if (itemsSubtotal <= 0) return "Enter item prices first";
+    if (Number.isFinite(buyPriceNum) && buyPriceNum > itemsSubtotal) {
+      return `Above items total ${formatCurrency(itemsSubtotal, prefs.currencySymbol)} — discount held at 0`;
+    }
+    const margin = itemsSubtotal > 0 ? Math.round((discountValue / itemsSubtotal) * 100) : 0;
+    return `Items total ${formatCurrency(itemsSubtotal, prefs.currencySymbol)} · discount ${formatCurrency(discountValue, prefs.currencySymbol)} (${margin}%)`;
+  })();
+
+  const discountField = register("productDiscount", { valueAsNumber: true });
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -178,7 +225,7 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
         <h3 className="text-sm font-semibold text-t1 mb-1">Fees</h3>
         <hr className="border-line mb-4" />
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {/* Service Fee with type toggle */}
           <div className="w-full">
             <label className="mb-1.5 block text-sm font-medium text-t2">Service Fee</label>
@@ -215,6 +262,18 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
             {errors.serviceFee && <p className="mt-1.5 text-xs text-danger">{errors.serviceFee.message}</p>}
           </div>
 
+          {/* Actual Buy Price — drives Product Discount, never stored itself */}
+          <GlassInput
+            label="Actual Buy Price"
+            type="number"
+            min={0}
+            step={0.01}
+            placeholder="What you paid"
+            value={buyPriceValue}
+            onChange={(e) => handleBuyPriceChange(e.target.value)}
+            hint={buyPriceHint}
+          />
+
           {/* Product Discount */}
           <GlassInput
             label="Product Discount"
@@ -222,7 +281,11 @@ export function OrderForm({ defaultValues, onSubmit, isLoading, onCancel }: Orde
             min={0}
             step={0.01}
             error={errors.productDiscount?.message}
-            {...register("productDiscount", { valueAsNumber: true })}
+            {...discountField}
+            onChange={(e) => {
+              discountField.onChange(e);
+              setBuyPriceDraft(null);
+            }}
           />
         </div>
 
