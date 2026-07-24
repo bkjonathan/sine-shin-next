@@ -5,6 +5,7 @@ import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { GlassButton } from "@/components/ui/glass-button";
 import { OrderStatusBadge } from "./order-status-badge";
+import { OrderPaymentReceiptButton } from "./order-payment-receipt-button";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { useDeleteOrder } from "@/hooks/use-orders";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
@@ -176,6 +177,7 @@ export function OrderTable({ orders, isLoading, pageOffset = 0 }: OrderTableProp
           >
             <Printer className="h-3.5 w-3.5" />
           </GlassButton>
+          <OrderPaymentReceiptButton orderId={row.original.id} />
           <GlassButton variant="ghost" size="sm" asChild aria-label="Edit order">
             <Link href={`/orders/${row.original.id}`}>
               <Pencil className="h-3.5 w-3.5" />

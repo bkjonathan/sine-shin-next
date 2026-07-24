@@ -4,6 +4,8 @@ import { useState, useRef, useEffect, useCallback, type ReactNode } from "react"
 import type { ShopSettings } from "@/types";
 import { InvoicePrintLayout } from "@/components/invoice/InvoicePrintLayout";
 import { InvoiceDownloadTemplate } from "@/components/invoice/InvoiceDownloadTemplate";
+import { PaymentReceivedTemplate } from "@/components/invoice/PaymentReceivedTemplate";
+import { formatPrice } from "@/utils/invoiceCalculations";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -43,6 +45,7 @@ import {
   X,
   Printer,
   Download,
+  Receipt,
 } from "lucide-react";
 import { GlassButton } from "@/components/ui/glass-button";
 
@@ -206,7 +209,9 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
   const { prefs } = useCurrencyPrefs();
   const downloadRef = useRef<HTMLDivElement>(null);
   const printRef = useRef<HTMLDivElement>(null);
+  const receiptRef = useRef<HTMLDivElement>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloadingReceipt, setIsDownloadingReceipt] = useState(false);
 
   // Local optimistic state
   const [order, setOrder] = useState(initialOrder);
@@ -293,6 +298,12 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
   const invoiceOrderTotal = itemsSubtotal + feesTotal;
   const invoiceTotalWithExchange = invoiceOrderTotal * order.exchangeRate;
 
+  // ── Payment received amount (same total the invoice shows) ──────────
+  const receiptAmountLabel =
+    order.exchangeRate !== 1
+      ? `${formatPrice(invoiceTotalWithExchange)} ${prefs.exchangeCurrencyCode}`
+      : `${prefs.currencySymbol} ${formatPrice(invoiceOrderTotal)}`;
+
   // ── Invoice actions ──────────────────────────────────────────────────
   async function handleDownload() {
     const el = downloadRef.current;
@@ -352,6 +363,60 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
     window.print();
   }
 
+  async function handleDownloadReceipt() {
+    const el = receiptRef.current;
+    if (!el) return;
+    setIsDownloadingReceipt(true);
+    try {
+      // Temporarily bring the element on-screen so the browser computes layout
+      el.style.position = "absolute";
+      el.style.left = "0";
+      el.style.top = "0";
+      el.style.zIndex = "-9999";
+      el.style.opacity = "0";
+      el.style.pointerEvents = "none";
+
+      // Wait for layout recalculation + images
+      await document.fonts.ready;
+      const images = el.querySelectorAll("img");
+      await Promise.all(
+        Array.from(images).map((img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise<void>((resolve) => { img.onload = () => resolve(); img.onerror = () => resolve(); })
+        )
+      );
+      await new Promise((r) => setTimeout(r, 300));
+
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(el, {
+        pixelRatio: 2,
+        skipFonts: true,
+        width: 480,
+        height: el.scrollHeight || 900,
+        style: {
+          position: "static",
+          left: "auto",
+          top: "auto",
+          opacity: "1",
+        },
+      });
+      const link = document.createElement("a");
+      link.download = `payment-received_${order.orderId}.png`;
+      link.href = dataUrl;
+      link.click();
+    } finally {
+      // Restore off-screen positioning
+      el.style.position = "fixed";
+      el.style.left = "-9999px";
+      el.style.top = "-9999px";
+      el.style.zIndex = "";
+      el.style.opacity = "";
+      el.style.pointerEvents = "";
+      setIsDownloadingReceipt(false);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* ── Header ──────────────────────────────────────────────────────── */}
@@ -375,6 +440,10 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
               <GlassButton variant="ghost" size="sm" onClick={handleDownload} loading={isDownloading}>
                 <Download className="h-3.5 w-3.5" />
                 <span className="text-xs">Download</span>
+              </GlassButton>
+              <GlassButton variant="ghost" size="sm" onClick={handleDownloadReceipt} loading={isDownloadingReceipt}>
+                <Receipt className="h-3.5 w-3.5" />
+                <span className="text-xs">Receipt</span>
               </GlassButton>
               <OrderDetailActions orderId={order.id} />
             </div>
@@ -847,6 +916,14 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
         serviceFeeAmount={serviceFeeAmount}
         orderTotal={invoiceOrderTotal}
         totalWithExchange={invoiceTotalWithExchange}
+      />
+      <PaymentReceivedTemplate
+        ref={receiptRef}
+        shop={shop}
+        order={order}
+        customer={customer}
+        amountLabel={receiptAmountLabel}
+        receivedDate={formatDate(new Date())}
       />
     </div>
   );
