@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { useUsers, useCreateUser } from "@/hooks/use-users";
 import { UserTable } from "@/components/users/user-table";
@@ -50,11 +50,15 @@ export default function UsersPage() {
   const [limit, setLimit] = useState(10);
   const [sort, setSort] = useState("createdAt");
   const [order, setOrder] = useState<SortOrder>("desc");
-  const [view, setView] = useState<"table" | "grid">(() =>
-    typeof window !== "undefined" && window.innerWidth < 768 ? "grid" : "table"
-  );
+  const [view, setView] = useState<"table" | "grid">("table");
   const [creating, setCreating] = useState(false);
   const createUser = useCreateUser();
+
+  // Adjust default view after mount to avoid SSR/client hydration mismatch
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (window.innerWidth < 768) setView("grid");
+  }, []);
 
   const { data, isLoading } = useUsers({ page, search, limit, sort, order });
 

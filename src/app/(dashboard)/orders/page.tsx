@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useOrders, useCreateOrder } from "@/hooks/use-orders";
 import { OrderTable } from "@/components/orders/order-table";
 import { PageHeader } from "@/components/layout/page-header";
@@ -45,11 +45,15 @@ export default function OrdersPage() {
   const [limit, setLimit] = useState(10);
   const [sort, setSort] = useState("createdAt");
   const [order, setOrder] = useState<SortOrder>("desc");
-  const [view, setView] = useState<"table" | "grid">(() =>
-    typeof window !== "undefined" && window.innerWidth < 768 ? "grid" : "table"
-  );
+  const [view, setView] = useState<"table" | "grid">("table");
   const [creating, setCreating] = useState(false);
   const createOrder = useCreateOrder();
+
+  // Adjust default view after mount to avoid SSR/client hydration mismatch
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (window.innerWidth < 768) setView("grid");
+  }, []);
   const { prefs } = useCurrencyPrefs();
 
   const { data, isLoading } = useOrders({ page, search, searchField, status, limit, sort, order });

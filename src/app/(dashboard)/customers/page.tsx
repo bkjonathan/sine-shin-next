@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useCustomers, useCreateCustomer } from "@/hooks/use-customers";
 import { CustomerTable } from "@/components/customers/customer-table";
 import { PageHeader } from "@/components/layout/page-header";
@@ -42,11 +42,15 @@ export default function CustomersPage() {
   const [limit, setLimit] = useState(10);
   const [sort, setSort] = useState("customerId");
   const [order, setOrder] = useState<SortOrder>("desc");
-  const [view, setView] = useState<"table" | "grid">(() =>
-    typeof window !== "undefined" && window.innerWidth < 768 ? "grid" : "table"
-  );
+  const [view, setView] = useState<"table" | "grid">("table");
   const [creating, setCreating] = useState(false);
   const createCustomer = useCreateCustomer();
+
+  // Adjust default view after mount to avoid SSR/client hydration mismatch
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (window.innerWidth < 768) setView("grid");
+  }, []);
 
   const { data, isLoading } = useCustomers({ page, search, searchField, limit, sort, order });
 
