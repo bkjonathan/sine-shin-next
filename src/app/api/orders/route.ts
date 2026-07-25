@@ -54,8 +54,8 @@ export async function GET(req: NextRequest) {
           deletedAt: orders.deletedAt,
           customerName: customers.name,
           customerDisplayId: customers.customerId,
-          totalQty: sql<number>`(SELECT COALESCE(SUM(oi.product_qty), 0)::int FROM order_items oi WHERE oi.order_id = ${orders.id} AND oi.deleted_at IS NULL)`,
-          totalWeight: sql<number>`(SELECT COALESCE(SUM(oi.product_weight), 0) FROM order_items oi WHERE oi.order_id = ${orders.id} AND oi.deleted_at IS NULL)`,
+          totalQty: sql<number>`(SELECT COALESCE(SUM(oi.product_qty), 0)::int FROM order_items oi WHERE oi.order_id = orders.id AND oi.deleted_at IS NULL)`,
+          totalWeight: sql<number>`(SELECT COALESCE(SUM(oi.product_weight), 0) FROM order_items oi WHERE oi.order_id = orders.id AND oi.deleted_at IS NULL)`,
         })
         .from(orders)
         .leftJoin(customers, eq(orders.customerId, customers.id))

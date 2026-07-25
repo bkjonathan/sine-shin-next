@@ -23,6 +23,7 @@ export async function GET(_req: NextRequest) {
         logoUrl: null,
         customerIdPrefix: "CUST",
         orderIdPrefix: "ORD",
+        cargoIdPrefix: "CG",
       },
     });
   }

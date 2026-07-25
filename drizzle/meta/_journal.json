@@ -15,6 +15,13 @@
       "when": 1743379200000,
       "tag": "0001_service_fee_type_normalize",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1753420800000,
+      "tag": "0002_add_cargo_tables",
+      "breakpoints": true
     }
   ]
 }

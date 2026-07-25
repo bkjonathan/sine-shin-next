@@ -8,5 +8,6 @@ export const shopSettings = pgTable("shop_settings", {
   logoUrl: varchar("logo_cloud_url", { length: 500 }),
   customerIdPrefix: varchar("customer_id_prefix", { length: 20 }).notNull().default("CUST"),
   orderIdPrefix: varchar("order_id_prefix", { length: 20 }).notNull().default("ORD"),
+  cargoIdPrefix: varchar("cargo_id_prefix", { length: 20 }).notNull().default("CG"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

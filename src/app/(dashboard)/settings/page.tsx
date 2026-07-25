@@ -3,21 +3,33 @@
 import { useEffect, useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import type { z } from "zod";
 import {
   Settings, User, Palette, Database, Cloud,
   Sun, Moon, Check, Trash2, Users, ShoppingCart, Receipt,
-  RotateCcw, Trash, Search, AlertTriangle,
+  RotateCcw, Trash, Search, AlertTriangle, Plane, Plus, Pencil,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTheme, type ThemeAccent, type FontSize } from "@/contexts/theme-context";
 import { useSettings, useUpdateSettings, useChangePassword } from "@/hooks/use-settings";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import {
+  useCargoCategories,
+  useCreateCargoCategory,
+  useUpdateCargoCategory,
+  useDeleteCargoCategory,
+} from "@/hooks/use-cargo-categories";
+import {
   updateSettingsSchema,
   changePasswordSchema,
   type UpdateSettingsInput,
   type ChangePasswordInput,
 } from "@/validations/settings.schema";
+import {
+  createCargoCategorySchema,
+  type CreateCargoCategoryInput,
+} from "@/validations/cargo.schema";
+import type { CargoCategory } from "@/types";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassTextarea } from "@/components/ui/glass-textarea";
 import { GlassButton } from "@/components/ui/glass-button";
@@ -27,8 +39,8 @@ import UsersPage from "@/app/(dashboard)/users/page";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = "general" | "account" | "appearance" | "users" | "data" | "sync" | "trash";
-type TrashType = "all" | "customers" | "orders" | "expenses";
+type Tab = "general" | "account" | "appearance" | "users" | "data" | "sync" | "trash" | "cargo";
+type TrashType = "all" | "customers" | "orders" | "expenses" | "cargoShipments";
 
 interface NavItem {
   id:    Tab;
@@ -41,6 +53,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "account",    label: "Account Settings", icon: User      },
   { id: "appearance", label: "Appearance",        icon: Palette   },
   { id: "users",      label: "Users",             icon: Users     },
+  { id: "cargo",      label: "Cargo Categories",  icon: Plane     },
   { id: "data",       label: "Data",              icon: Database  },
   { id: "sync",       label: "Sync",              icon: Cloud     },
   { id: "trash",      label: "Trash",             icon: Trash2    },
@@ -146,6 +159,7 @@ function GeneralPanel() {
       logoUrl:          "",
       customerIdPrefix: "CUST",
       orderIdPrefix:    "ORD",
+      cargoIdPrefix:    "CG",
     },
   });
 
@@ -158,6 +172,7 @@ function GeneralPanel() {
         logoUrl:          settings.logoUrl           ?? "",
         customerIdPrefix: settings.customerIdPrefix,
         orderIdPrefix:    settings.orderIdPrefix,
+        cargoIdPrefix:    settings.cargoIdPrefix,
       });
   }, [settings, reset]);
 
@@ -170,9 +185,10 @@ function GeneralPanel() {
           <GlassInput label="Phone"                                         {...register("phone")} />
           <GlassTextarea label="Address"                                    {...register("address")} />
           <GlassInput label="Logo URL" placeholder="https://…"  error={errors.logoUrl?.message} {...register("logoUrl")} />
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <GlassInput label="Customer ID Prefix" placeholder="CUST" error={errors.customerIdPrefix?.message} {...register("customerIdPrefix")} />
             <GlassInput label="Order ID Prefix"    placeholder="ORD"  error={errors.orderIdPrefix?.message}    {...register("orderIdPrefix")} />
+            <GlassInput label="Cargo ID Prefix"    placeholder="CG"   error={errors.cargoIdPrefix?.message}    {...register("cargoIdPrefix")} />
           </div>
         </div>
         <div className="mt-6 flex justify-end">
@@ -347,10 +363,19 @@ interface DeletedExpense {
   deletedAt: string;
 }
 
+interface DeletedCargoShipment {
+  id: string;
+  cargoNo: string;
+  carrierName: string | null;
+  status: string;
+  deletedAt: string;
+}
+
 interface TrashData {
   customers: DeletedCustomer[];
   orders: DeletedOrder[];
   expenses: DeletedExpense[];
+  cargoShipments: DeletedCargoShipment[];
 }
 
 // ─── Trash Panel ──────────────────────────────────────────────────────────────
@@ -362,6 +387,21 @@ const STATUS_COLORS: Record<string, string> = {
   shipping:  "bg-blue-500/15 text-blue-400",
   completed: "bg-green-500/15 text-green-400",
   cancelled: "bg-red-500/15 text-red-400",
+};
+
+const TRASH_TYPE_PATHS: Record<"customers" | "orders" | "expenses" | "cargoShipments", string> = {
+  customers: "customers",
+  orders: "orders",
+  expenses: "expenses",
+  cargoShipments: "cargo-shipments",
+};
+
+const CARGO_STATUS_COLORS: Record<string, string> = {
+  pending:     "bg-amber-500/15 text-amber-400",
+  in_transit:  "bg-blue-500/15 text-blue-400",
+  arrived:     "bg-purple-500/15 text-purple-400",
+  delivered:   "bg-green-500/15 text-green-400",
+  cancelled:   "bg-red-500/15 text-red-400",
 };
 
 const EXPENSE_CATEGORY_COLORS: Record<string, string> = {
@@ -389,10 +429,10 @@ function formatDate(d: string | null | undefined) {
 function TrashPanel() {
   const [activeType, setActiveType] = useState<TrashType>("all");
   const [search, setSearch] = useState("");
-  const [data, setData] = useState<TrashData>({ customers: [], orders: [], expenses: [] });
+  const [data, setData] = useState<TrashData>({ customers: [], orders: [], expenses: [], cargoShipments: [] });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<{ id: string; type: "customers" | "orders" | "expenses"; label: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; type: "customers" | "orders" | "expenses" | "cargoShipments"; label: string } | null>(null);
   const [toast, setToast] = useState<{ message: string; kind: "success" | "error" } | null>(null);
 
   const showToast = useCallback((message: string, kind: "success" | "error") => {
@@ -413,10 +453,10 @@ function TrashPanel() {
 
   useEffect(() => { fetchTrash(); }, [fetchTrash]);
 
-  async function handleRestore(type: "customers" | "orders" | "expenses", id: string) {
+  async function handleRestore(type: "customers" | "orders" | "expenses" | "cargoShipments", id: string) {
     setActionLoading(`restore-${id}`);
     try {
-      const res = await fetch(`/api/trash/${type}/${id}`, { method: "PATCH" });
+      const res = await fetch(`/api/trash/${TRASH_TYPE_PATHS[type]}/${id}`, { method: "PATCH" });
       if (!res.ok) throw new Error();
       showToast("Record restored successfully", "success");
       fetchTrash();
@@ -433,7 +473,7 @@ function TrashPanel() {
     setActionLoading(`delete-${id}`);
     setConfirmDelete(null);
     try {
-      const res = await fetch(`/api/trash/${type}/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/trash/${TRASH_TYPE_PATHS[type]}/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error();
       showToast("Record permanently deleted", "success");
       fetchTrash();
@@ -455,21 +495,27 @@ function TrashPanel() {
   const filteredExpenses = data.expenses.filter((e) =>
     !q || e.description.toLowerCase().includes(q) || (e.expenseId ?? "").toLowerCase().includes(q)
   );
+  const filteredCargoShipments = data.cargoShipments.filter((c) =>
+    !q || c.cargoNo.toLowerCase().includes(q) || (c.carrierName ?? "").toLowerCase().includes(q)
+  );
 
   const showCustomers = activeType === "all" || activeType === "customers";
   const showOrders    = activeType === "all" || activeType === "orders";
   const showExpenses  = activeType === "all" || activeType === "expenses";
+  const showCargoShipments = activeType === "all" || activeType === "cargoShipments";
 
   const totalVisible =
     (showCustomers ? filteredCustomers.length : 0) +
     (showOrders    ? filteredOrders.length    : 0) +
-    (showExpenses  ? filteredExpenses.length  : 0);
+    (showExpenses  ? filteredExpenses.length  : 0) +
+    (showCargoShipments ? filteredCargoShipments.length : 0);
 
   const TYPE_FILTERS: { id: TrashType; label: string; icon: React.ElementType; count: number }[] = [
-    { id: "all",       label: "All",       icon: Trash2,       count: data.customers.length + data.orders.length + data.expenses.length },
+    { id: "all",       label: "All",       icon: Trash2,       count: data.customers.length + data.orders.length + data.expenses.length + data.cargoShipments.length },
     { id: "customers", label: "Customers", icon: Users,        count: data.customers.length },
     { id: "orders",    label: "Orders",    icon: ShoppingCart, count: data.orders.length    },
     { id: "expenses",  label: "Expenses",  icon: Receipt,      count: data.expenses.length  },
+    { id: "cargoShipments", label: "Cargo", icon: Plane,       count: data.cargoShipments.length },
   ];
 
   return (
@@ -714,6 +760,60 @@ function TrashPanel() {
             </div>
           )}
 
+          {/* Cargo Shipments */}
+          {showCargoShipments && filteredCargoShipments.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <Plane className="h-3.5 w-3.5 text-t3" />
+                <span className="text-xs font-semibold uppercase tracking-[0.15em] text-t3">
+                  Cargo Shipments ({filteredCargoShipments.length})
+                </span>
+              </div>
+              <div className="rounded-2xl border border-line overflow-hidden">
+                {filteredCargoShipments.map((c, i) => (
+                  <div
+                    key={c.id}
+                    className={cn(
+                      "flex items-center justify-between gap-4 px-4 py-3",
+                      i !== filteredCargoShipments.length - 1 && "border-b border-divide",
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium text-t1 font-mono">{c.cargoNo}</span>
+                        <TrashBadge label={c.status} colorClass={CARGO_STATUS_COLORS[c.status] ?? "bg-white/10 text-t3"} />
+                      </div>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        {c.carrierName && <span className="text-xs text-t3">{c.carrierName}</span>}
+                        <span className="text-xs text-t3">Deleted {formatDate(c.deletedAt)}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleRestore("cargoShipments", c.id)}
+                        disabled={actionLoading === `restore-${c.id}`}
+                        title="Restore"
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-field text-t2 transition-all hover:border-accent/50 hover:text-accent disabled:opacity-40"
+                      >
+                        <RotateCcw className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDelete({ id: c.id, type: "cargoShipments", label: c.cargoNo })}
+                        disabled={!!actionLoading}
+                        title="Delete permanently"
+                        className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-field text-t2 transition-all hover:border-ios-red/50 hover:text-ios-red disabled:opacity-40"
+                      >
+                        <Trash className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
         </div>
       )}
 
@@ -743,6 +843,177 @@ function TrashPanel() {
   );
 }
 
+// ─── Cargo Categories Panel ─────────────────────────────────────────────────
+
+function CargoCategoryForm({
+  defaultValues,
+  onSubmit,
+  isLoading,
+  onCancel,
+}: {
+  defaultValues?: Partial<CargoCategory>;
+  onSubmit: (data: CreateCargoCategoryInput) => void;
+  isLoading?: boolean;
+  onCancel: () => void;
+}) {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<z.input<typeof createCargoCategorySchema>, unknown, CreateCargoCategoryInput>({
+    resolver: zodResolver(createCargoCategorySchema),
+    defaultValues: {
+      name: defaultValues?.name ?? "",
+      carrierRatePerKg: defaultValues?.carrierRatePerKg ?? 0,
+      receiverRatePerKg: defaultValues?.receiverRatePerKg ?? 0,
+      isActive: defaultValues?.isActive ?? true,
+    },
+  });
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <GlassInput label="Category Name" placeholder="Electronic" error={errors.name?.message} {...register("name")} />
+      <div className="grid grid-cols-2 gap-4">
+        <GlassInput
+          label="Carrier Rate / kg"
+          type="number"
+          min={0}
+          step={0.01}
+          error={errors.carrierRatePerKg?.message}
+          {...register("carrierRatePerKg", { valueAsNumber: true })}
+        />
+        <GlassInput
+          label="Receiver Rate / kg"
+          type="number"
+          min={0}
+          step={0.01}
+          error={errors.receiverRatePerKg?.message}
+          {...register("receiverRatePerKg", { valueAsNumber: true })}
+        />
+      </div>
+      <div className="flex justify-end gap-3 pt-2">
+        <GlassButton type="button" variant="secondary" onClick={onCancel}>Cancel</GlassButton>
+        <GlassButton type="submit" loading={isLoading}>{defaultValues?.id ? "Save Changes" : "Add Category"}</GlassButton>
+      </div>
+    </form>
+  );
+}
+
+function CargoCategoriesPanel() {
+  const { data: categories, isLoading } = useCargoCategories();
+  const createCategory = useCreateCargoCategory();
+  const updateCategory = useUpdateCargoCategory();
+  const deleteCategory = useDeleteCargoCategory();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editing, setEditing] = useState<CargoCategory | null>(null);
+
+  function openCreate() {
+    setEditing(null);
+    setModalOpen(true);
+  }
+
+  function openEdit(category: CargoCategory) {
+    setEditing(category);
+    setModalOpen(true);
+  }
+
+  function handleSubmit(data: CreateCargoCategoryInput) {
+    if (editing) {
+      updateCategory.mutate({ id: editing.id, ...data }, { onSuccess: () => setModalOpen(false) });
+    } else {
+      createCategory.mutate(data, { onSuccess: () => setModalOpen(false) });
+    }
+  }
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center justify-between">
+        <div>
+          <SectionDivider title="Cargo Pricing Categories" />
+          <p className="-mt-3 text-xs text-t3">
+            Per-kg rates used when adding items to a cargo shipment. The gap between carrier and receiver rate is your profit margin.
+          </p>
+        </div>
+        <GlassButton size="sm" onClick={openCreate}>
+          <Plus className="h-3.5 w-3.5" /> Add Category
+        </GlassButton>
+      </div>
+
+      {isLoading ? (
+        <div className="flex items-center justify-center py-16 text-t3 text-sm">Loading categories…</div>
+      ) : !categories || categories.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl border border-line bg-field">
+            <Plane className="h-5 w-5 text-t3" />
+          </div>
+          <p className="text-sm font-medium text-t1">No categories yet</p>
+          <p className="mt-1 text-xs text-t3">Add a category like Electronic, Cosmetic, or General to start pricing shipments.</p>
+        </div>
+      ) : (
+        <div className="rounded-2xl border border-line overflow-hidden">
+          {categories.map((c, i) => (
+            <div
+              key={c.id}
+              className={cn(
+                "flex items-center justify-between gap-4 px-4 py-3",
+                i !== categories.length - 1 && "border-b border-divide",
+                !c.isActive && "opacity-50"
+              )}
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-t1">{c.name}</span>
+                  {!c.isActive && <TrashBadge label="Inactive" colorClass="bg-white/10 text-t3" />}
+                </div>
+                <div className="flex items-center gap-3 mt-0.5">
+                  <span className="text-xs text-t3">Carrier {c.carrierRatePerKg.toFixed(2)}/kg</span>
+                  <span className="text-xs text-t3">Receiver {c.receiverRatePerKg.toFixed(2)}/kg</span>
+                  <span className="text-xs font-medium text-success">Margin {(c.receiverRatePerKg - c.carrierRatePerKg).toFixed(2)}/kg</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => updateCategory.mutate({ id: c.id, isActive: !c.isActive })}
+                  title={c.isActive ? "Deactivate" : "Activate"}
+                  className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-field text-t2 transition-all hover:border-accent/50 hover:text-accent"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openEdit(c)}
+                  title="Edit"
+                  className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-field text-t2 transition-all hover:border-accent/50 hover:text-accent"
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { if (confirm(`Delete category "${c.name}"?`)) deleteCategory.mutate(c.id); }}
+                  title="Delete"
+                  className="flex h-8 w-8 items-center justify-center rounded-xl border border-line bg-field text-t2 transition-all hover:border-ios-red/50 hover:text-ios-red"
+                >
+                  <Trash className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <GlassModal open={modalOpen} onOpenChange={setModalOpen} title={editing ? "Edit Category" : "New Category"} size="sm">
+        <CargoCategoryForm
+          defaultValues={editing ?? undefined}
+          onSubmit={handleSubmit}
+          isLoading={createCategory.isPending || updateCategory.isPending}
+          onCancel={() => setModalOpen(false)}
+        />
+      </GlassModal>
+    </div>
+  );
+}
+
 function PlaceholderPanel({ title, description }: { title: string; description: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -767,6 +1038,7 @@ export default function SettingsPage() {
     account:    "Manage your account credentials",
     appearance: "Customize the look and feel",
     users:      "Manage team members and their access roles",
+    cargo:      "Manage cargo pricing categories and per-kg rates",
     data:       "Import, export and manage your data",
     sync:       "Sync settings across devices",
     trash:      "View and manage deleted records",
@@ -837,6 +1109,7 @@ export default function SettingsPage() {
             {tab === "account"    && <AccountPanel />}
             {tab === "appearance" && <AppearancePanel />}
             {tab === "users"      && <UsersPage />}
+            {tab === "cargo"      && <CargoCategoriesPanel />}
             {tab === "data"       && <PlaceholderPanel title="Data Management" description="Export and import features coming soon." />}
             {tab === "sync"       && <PlaceholderPanel title="Sync" description="Cloud sync features coming soon." />}
             {tab === "trash"      && <TrashPanel />}

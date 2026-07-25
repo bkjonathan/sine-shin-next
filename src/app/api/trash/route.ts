@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { customers, orders, expenses } from "@/db/schema";
+import { customers, orders, expenses, cargoShipments } from "@/db/schema";
 import { isNotNull, desc } from "drizzle-orm";
 import { auth } from "@/lib/auth";
 
@@ -10,9 +10,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const { searchParams } = req.nextUrl;
-    const type = searchParams.get("type") ?? "all"; // all | customers | orders | expenses
+    const type = searchParams.get("type") ?? "all"; // all | customers | orders | expenses | cargoShipments
 
-    const [deletedCustomers, deletedOrders, deletedExpenses] = await Promise.all([
+    const [deletedCustomers, deletedOrders, deletedExpenses, deletedCargoShipments] = await Promise.all([
       type === "all" || type === "customers"
         ? db.select().from(customers).where(isNotNull(customers.deletedAt)).orderBy(desc(customers.deletedAt))
         : Promise.resolve([]),
@@ -22,6 +22,9 @@ export async function GET(req: NextRequest) {
       type === "all" || type === "expenses"
         ? db.select().from(expenses).where(isNotNull(expenses.deletedAt)).orderBy(desc(expenses.deletedAt))
         : Promise.resolve([]),
+      type === "all" || type === "cargoShipments"
+        ? db.select().from(cargoShipments).where(isNotNull(cargoShipments.deletedAt)).orderBy(desc(cargoShipments.deletedAt))
+        : Promise.resolve([]),
     ]);
 
     return NextResponse.json({
@@ -29,13 +32,15 @@ export async function GET(req: NextRequest) {
         customers: deletedCustomers,
         orders: deletedOrders,
         expenses: deletedExpenses,
+        cargoShipments: deletedCargoShipments,
       },
       meta: {
-        total: deletedCustomers.length + deletedOrders.length + deletedExpenses.length,
+        total: deletedCustomers.length + deletedOrders.length + deletedExpenses.length + deletedCargoShipments.length,
         counts: {
           customers: deletedCustomers.length,
           orders: deletedOrders.length,
           expenses: deletedExpenses.length,
+          cargoShipments: deletedCargoShipments.length,
         },
       },
     });

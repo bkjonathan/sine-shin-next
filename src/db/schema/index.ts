@@ -4,3 +4,7 @@ export { orders } from "./orders";
 export { orderItems } from "./order-items";
 export { expenses } from "./expenses";
 export { shopSettings } from "./shop-settings";
+export { cargoCategories } from "./cargo-categories";
+export { cargoShipments } from "./cargo-shipments";
+export { cargoItems } from "./cargo-items";
+export { cargoPayments } from "./cargo-payments";

@@ -16,6 +16,7 @@ import {
   UserCog,
   BarChart3,
   Calculator,
+  Plane,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ShopSettings } from "@/types";
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/customers", label: "Customers", icon: Users },
   { href: "/orders", label: "Orders", icon: ShoppingCart },
+  { href: "/cargo", label: "Cargo", icon: Plane },
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/reports", label: "Reports", icon: BarChart3, ownerOnly: true },
   { href: "/users", label: "Users", icon: UserCog, ownerOnly: true },

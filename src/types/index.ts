@@ -6,9 +6,14 @@ import type {
   orderItems,
   expenses,
   shopSettings,
+  cargoCategories,
+  cargoShipments,
+  cargoItems,
+  cargoPayments,
 } from "@/db/schema";
 import type { ORDER_STATUSES } from "@/validations/order.schema";
 import type { EXPENSE_CATEGORIES } from "@/validations/expense.schema";
+import type { CARGO_STATUSES, CargoPartyType } from "@/validations/cargo.schema";
 
 // ── Drizzle inferred types ────────────────────────────────────────────────────
 
@@ -29,11 +34,24 @@ export type NewExpense = InferInsertModel<typeof expenses>;
 
 export type ShopSettings = InferSelectModel<typeof shopSettings>;
 
+export type CargoCategory = InferSelectModel<typeof cargoCategories>;
+export type NewCargoCategory = InferInsertModel<typeof cargoCategories>;
+
+export type CargoShipment = InferSelectModel<typeof cargoShipments>;
+export type NewCargoShipment = InferInsertModel<typeof cargoShipments>;
+
+export type CargoItem = InferSelectModel<typeof cargoItems>;
+export type NewCargoItem = InferInsertModel<typeof cargoItems>;
+
+export type CargoPayment = InferSelectModel<typeof cargoPayments>;
+export type NewCargoPayment = InferInsertModel<typeof cargoPayments>;
+
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
 export type UserRole = "owner" | "manager" | "staff";
+export type CargoStatus = (typeof CARGO_STATUSES)[number];
 
 // ── API response envelope ─────────────────────────────────────────────────────
 
@@ -78,6 +96,34 @@ export type OrderListItem = Pick<Order, "id" | "orderId" | "customerId" | "statu
 export type OrderWithItems = Order & {
   items: OrderItem[];
   customer: Pick<Customer, "id" | "name" | "customerId"> | null;
+};
+
+export type CargoShipmentListItem = Pick<CargoShipment, "id" | "cargoNo" | "carrierName" | "status" | "exchangeRate" | "createdAt" | "deletedAt"> & {
+  totalWeight: number;
+  itemCount: number;
+  carrierOwed: number;
+  receiverOwed: number;
+};
+
+export type CargoItemWithLabels = CargoItem & {
+  orderDisplayId: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  customerAddress: string | null;
+  customerCity: string | null;
+  customerDisplayId: string | null;
+  categoryName: string | null;
+  productUrl: string | null;
+};
+
+export type CargoPaymentWithCustomer = Omit<CargoPayment, "partyType"> & {
+  partyType: CargoPartyType;
+  customerName: string | null;
+};
+
+export type CargoShipmentWithDetails = CargoShipment & {
+  items: CargoItemWithLabels[];
+  payments: CargoPaymentWithCustomer[];
 };
 
 // ── List filter params ────────────────────────────────────────────────────────

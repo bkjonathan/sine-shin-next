@@ -7,6 +7,7 @@ export const updateSettingsSchema = z.object({
   logoUrl: z.string().url("Must be a valid URL").max(500).optional().nullable().or(z.literal("")),
   customerIdPrefix: z.string().min(1).max(20).toUpperCase().transform((v) => v.replace(/-+$/, "")),
   orderIdPrefix: z.string().min(1).max(20).toUpperCase().transform((v) => v.replace(/-+$/, "")),
+  cargoIdPrefix: z.string().min(1).max(20).toUpperCase().transform((v) => v.replace(/-+$/, "")),
 });
 
 export const changePasswordSchema = z
