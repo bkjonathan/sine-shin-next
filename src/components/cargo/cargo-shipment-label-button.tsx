@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { PackageSearch } from "lucide-react";
 import { GlassButton } from "@/components/ui/glass-button";
 import { CargoShipmentLabelTemplate } from "@/components/cargo/CargoShipmentLabelTemplate";
+import { downloadDataUrl } from "@/utils/downloadImage";
 import type { ShopSettings, CargoShipment } from "@/types";
 
 interface CargoShipmentLabelButtonProps {
@@ -52,10 +53,7 @@ export function CargoShipmentLabelButton({
           opacity: "1",
         },
       });
-      const link = document.createElement("a");
-      link.download = `shipment-label_${shipment.cargoNo}_${orderDisplayId ?? "order"}.png`;
-      link.href = dataUrl;
-      link.click();
+      await downloadDataUrl(dataUrl, `shipment-label_${shipment.cargoNo}_${orderDisplayId ?? "order"}.png`);
     } finally {
       el.style.position = "fixed";
       el.style.left = "-9999px";

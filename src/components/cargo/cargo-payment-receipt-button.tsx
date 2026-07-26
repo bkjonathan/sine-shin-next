@@ -5,6 +5,7 @@ import { Receipt } from "lucide-react";
 import { GlassButton } from "@/components/ui/glass-button";
 import { CargoPaymentReceiptTemplate } from "@/components/cargo/CargoPaymentReceiptTemplate";
 import { formatDate } from "@/lib/utils";
+import { downloadDataUrl } from "@/utils/downloadImage";
 import type { ShopSettings } from "@/types";
 import type { CargoPartyType } from "@/validations/cargo.schema";
 
@@ -62,10 +63,7 @@ export function CargoPaymentReceiptButton({
           opacity: "1",
         },
       });
-      const link = document.createElement("a");
-      link.download = `${partyType}-payment_${cargoNo}.png`;
-      link.href = dataUrl;
-      link.click();
+      await downloadDataUrl(dataUrl, `${partyType}-payment_${cargoNo}.png`);
     } finally {
       el.style.position = "fixed";
       el.style.left = "-9999px";

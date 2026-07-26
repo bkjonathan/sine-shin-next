@@ -8,6 +8,7 @@ import { useOrder } from "@/hooks/use-orders";
 import { useSettings } from "@/hooks/use-settings";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { calculateOrderTotals, formatPrice } from "@/utils/invoiceCalculations";
+import { downloadDataUrl } from "@/utils/downloadImage";
 import { formatDate } from "@/lib/utils";
 
 interface OrderPaymentReceiptButtonProps {
@@ -68,10 +69,7 @@ export function OrderPaymentReceiptButton({ orderId }: OrderPaymentReceiptButton
           },
         });
         if (cancelled) return;
-        const link = document.createElement("a");
-        link.download = `payment-received_${fullOrder.orderId}.png`;
-        link.href = dataUrl;
-        link.click();
+        await downloadDataUrl(dataUrl, `payment-received_${fullOrder.orderId}.png`);
       } finally {
         if (!cancelled) {
           el.style.position = "fixed";

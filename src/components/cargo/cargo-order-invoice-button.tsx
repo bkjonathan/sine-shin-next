@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { FileText } from "lucide-react";
 import { GlassButton } from "@/components/ui/glass-button";
 import { CargoOrderInvoiceTemplate } from "@/components/cargo/CargoOrderInvoiceTemplate";
+import { downloadDataUrl } from "@/utils/downloadImage";
 import type { ShopSettings, CargoShipment, CargoItemWithLabels } from "@/types";
 
 interface CargoOrderInvoiceButtonProps {
@@ -59,10 +60,7 @@ export function CargoOrderInvoiceButton({
           opacity: "1",
         },
       });
-      const link = document.createElement("a");
-      link.download = `cargo-receiving-invoice_${shipment.cargoNo}_${orderDisplayId ?? "order"}.png`;
-      link.href = dataUrl;
-      link.click();
+      await downloadDataUrl(dataUrl, `cargo-receiving-invoice_${shipment.cargoNo}_${orderDisplayId ?? "order"}.png`);
     } finally {
       el.style.position = "fixed";
       el.style.left = "-9999px";

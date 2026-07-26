@@ -6,6 +6,7 @@ import { InvoicePrintLayout } from "@/components/invoice/InvoicePrintLayout";
 import { InvoiceDownloadTemplate } from "@/components/invoice/InvoiceDownloadTemplate";
 import { PaymentReceivedTemplate } from "@/components/invoice/PaymentReceivedTemplate";
 import { formatPrice } from "@/utils/invoiceCalculations";
+import { downloadDataUrl } from "@/utils/downloadImage";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -343,10 +344,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
           opacity: "1",
         },
       });
-      const link = document.createElement("a");
-      link.download = `invoice_${order.orderId}.png`;
-      link.href = dataUrl;
-      link.click();
+      await downloadDataUrl(dataUrl, `invoice_${order.orderId}.png`);
     } finally {
       // Restore off-screen positioning
       el.style.position = "fixed";
@@ -401,10 +399,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
           opacity: "1",
         },
       });
-      const link = document.createElement("a");
-      link.download = `payment-received_${order.orderId}.png`;
-      link.href = dataUrl;
-      link.click();
+      await downloadDataUrl(dataUrl, `payment-received_${order.orderId}.png`);
     } finally {
       // Restore off-screen positioning
       el.style.position = "fixed";

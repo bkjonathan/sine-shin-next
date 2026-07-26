@@ -15,6 +15,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { useUpdateCargoShipment } from "@/hooks/use-cargo";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { calculateCargoShipmentSummary } from "@/utils/cargoCalculations";
+import { downloadDataUrl } from "@/utils/downloadImage";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { CARGO_STATUSES } from "@/validations/cargo.schema";
 import type { CargoShipmentWithDetails, ShopSettings } from "@/types";
@@ -151,10 +152,7 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
           opacity: "1",
         },
       });
-      const link = document.createElement("a");
-      link.download = `cargo-invoice_${shipment.cargoNo}.png`;
-      link.href = dataUrl;
-      link.click();
+      await downloadDataUrl(dataUrl, `cargo-invoice_${shipment.cargoNo}.png`);
     } finally {
       el.style.position = "fixed";
       el.style.left = "-9999px";
