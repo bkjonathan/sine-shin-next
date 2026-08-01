@@ -50,7 +50,8 @@ export async function GET(
     .leftJoin(customers, eq(orders.customerId, customers.id))
     .leftJoin(cargoCategories, eq(cargoItems.categoryId, cargoCategories.id))
     .leftJoin(orderItems, eq(cargoItems.orderItemId, orderItems.id))
-    .where(and(eq(cargoItems.cargoShipmentId, id), isNull(cargoItems.deletedAt)));
+    .where(and(eq(cargoItems.cargoShipmentId, id), isNull(cargoItems.deletedAt)))
+    .orderBy(desc(cargoItems.createdAt));
 
   const payments = await db
     .select({

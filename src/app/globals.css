@@ -54,6 +54,8 @@
   --bg-panel: rgba(8, 18, 28, 0.88);
   --bg-modal: rgba(7, 17, 27, 0.94);
   --bg-field: rgba(255, 255, 255, 0.06);
+  --skeleton-base: rgba(255, 255, 255, 0.045);
+  --skeleton-sheen: rgba(255, 255, 255, 0.09);
 
   --text-1: rgba(255, 255, 255, 0.90);
   --text-2: rgba(235, 242, 255, 0.70);
@@ -95,6 +97,8 @@
   --bg-panel: rgba(255, 255, 255, 0.88);
   --bg-modal: rgba(255, 255, 255, 0.97);
   --bg-field: rgba(255, 255, 255, 0.9);
+  --skeleton-base: rgba(18, 29, 41, 0.06);
+  --skeleton-sheen: rgba(255, 255, 255, 0.65);
 
   --text-1: rgba(20, 31, 43, 0.92);
   --text-2: rgba(41, 53, 66, 0.72);
@@ -283,6 +287,70 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .animate-fade-up {
   animation: fade-up 0.6s ease-out both;
+}
+
+/* ─── SKELETON / SHIMMER ───────────────────────────────────────── */
+@keyframes skeleton-sheen {
+  100% { transform: translateX(100%); }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: var(--skeleton-base);
+  border-radius: 0.5rem;
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--skeleton-sheen) 50%,
+    transparent 100%
+  );
+  animation: skeleton-sheen 1.5s ease-in-out infinite;
+}
+
+/* ─── NAV PROGRESS BAR ─────────────────────────────────────────── */
+@keyframes nav-progress-indeterminate {
+  0%   { transform: translateX(-100%) scaleX(0.4); }
+  50%  { transform: translateX(0%)    scaleX(0.5); }
+  100% { transform: translateX(100%)  scaleX(0.6); }
+}
+
+.nav-progress {
+  position: fixed;
+  top: env(safe-area-inset-top);
+  left: 0;
+  right: 0;
+  height: 3px;
+  z-index: 200;
+  pointer-events: none;
+  background: transparent;
+}
+
+.nav-progress__bar {
+  height: 100%;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 55%, transparent), var(--accent));
+  box-shadow: 0 0 10px 1px var(--accent-shadow), 0 0 4px var(--accent);
+  transition: width 0.2s ease, opacity 0.35s ease 0.15s;
+  transform-origin: left;
+}
+
+.nav-progress__glow {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: 120px;
+  transform: translateX(100%);
+  box-shadow: 0 0 14px 4px var(--accent), 0 0 6px 2px var(--accent);
+  opacity: 0.55;
 }
 
 .animation-delay-1 {

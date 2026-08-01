@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Topbar } from "@/components/layout/topbar";
+import { NavProgress } from "@/components/layout/nav-progress";
 import type { ShopSettings } from "@/types";
 
 interface DashboardShellProps {
@@ -15,6 +16,7 @@ export function DashboardShell({ children, settings }: DashboardShellProps) {
 
   return (
     <div className="relative min-h-screen bg-page text-t1 transition-colors duration-500">
+      <NavProgress />
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="animate-float-slow absolute left-[-8rem] top-[8rem] h-72 w-72 rounded-full blur-3xl" style={{ background: "var(--gradient-blob-1)" }} />
         <div className="animate-float-reverse absolute right-[-6rem] top-16 h-80 w-80 rounded-full blur-3xl" style={{ background: "var(--gradient-blob-2)" }} />

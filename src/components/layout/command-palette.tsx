@@ -46,6 +46,8 @@ export function CommandPalette() {
 
   function runCommand(href: string) {
     setOpen(false);
+    // Show the global nav progress bar for this programmatic navigation.
+    (window as Window & { __navProgressStart?: () => void }).__navProgressStart?.();
     router.push(href);
   }
 

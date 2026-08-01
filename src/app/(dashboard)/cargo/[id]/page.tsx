@@ -48,7 +48,8 @@ export default async function CargoDetailPage({ params }: Props) {
       .leftJoin(customers, eq(orders.customerId, customers.id))
       .leftJoin(cargoCategories, eq(cargoItems.categoryId, cargoCategories.id))
       .leftJoin(orderItems, eq(cargoItems.orderItemId, orderItems.id))
-      .where(and(eq(cargoItems.cargoShipmentId, id), isNull(cargoItems.deletedAt))),
+      .where(and(eq(cargoItems.cargoShipmentId, id), isNull(cargoItems.deletedAt)))
+      .orderBy(desc(cargoItems.createdAt)),
     db
       .select({
         id: cargoPayments.id,
