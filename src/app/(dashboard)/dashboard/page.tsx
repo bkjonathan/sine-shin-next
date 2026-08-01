@@ -3,15 +3,18 @@
 import { useState, useMemo, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
-import { ArrowRight, Plus, Sparkles } from "lucide-react";
+import { ArrowRight, Plus, Sparkles, Calculator } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { OrderForm } from "@/components/orders/order-form";
+import PriceCalculator from "@/components/dashboard/PriceCalculator";
 import { useCreateOrder } from "@/hooks/use-orders";
 import { useDashboardData } from "@/hooks/useDashboardData";
+import { useDashboardCargo } from "@/hooks/useDashboardCargo";
 import { DashboardFilters, type Period } from "@/components/dashboard/DashboardFilters";
 import { DashboardStatsGrid } from "@/components/dashboard/DashboardStatsGrid";
+import { DashboardCargoOverview } from "@/components/dashboard/DashboardCargoOverview";
 import { DashboardDetailModal } from "@/components/dashboard/DashboardDetailModal";
 import { DashboardRecentOrders } from "@/components/dashboard/DashboardRecentOrders";
 import { buildDetailRecords } from "@/utils/calculations";
@@ -64,6 +67,7 @@ function RevenueChip({ revenue }: { revenue: string }) {
 export default function DashboardPage() {
   const { data: session } = useSession();
   const [creating, setCreating] = useState(false);
+  const [calcOpen, setCalcOpen] = useState(false);
   const createOrder = useCreateOrder();
 
   // Filters
@@ -91,6 +95,10 @@ export default function DashboardPage() {
   }, [period, dateField, statusFilter, customFrom, customTo]);
 
   const { orders, stats, isLoading } = useDashboardData(filters);
+  const { cargo, isLoading: cargoLoading } = useDashboardCargo({
+    date_from: filters.date_from,
+    date_to:   filters.date_to,
+  });
 
   const handleDrilldown = useCallback((type: DashboardRecordType) => {
     setDetailType(type);
@@ -142,9 +150,12 @@ export default function DashboardPage() {
                   Stay on top of orders, customer activity, and cash movement from one responsive workspace.
                 </p>
               </div>
-              <div className="flex shrink-0 gap-2">
+              <div className="flex shrink-0 flex-wrap gap-2">
                 <GlassButton onClick={() => setCreating(true)}>
                   <Plus className="h-4 w-4" /> New Order
+                </GlassButton>
+                <GlassButton variant="secondary" onClick={() => setCalcOpen(true)}>
+                  <Calculator className="h-4 w-4" /> Calculator
                 </GlassButton>
                 <GlassButton variant="secondary" asChild>
                   <Link href="/account">
@@ -188,6 +199,8 @@ export default function DashboardPage() {
         />
       </div>
 
+      <DashboardCargoOverview cargo={cargo} isLoading={cargoLoading} />
+
       <DashboardRecentOrders
         orders={stats?.recent_orders ?? []}
         isLoading={isLoading}
@@ -208,6 +221,16 @@ export default function DashboardPage() {
           isLoading={createOrder.isPending}
           onCancel={() => setCreating(false)}
         />
+      </GlassModal>
+
+      <GlassModal
+        open={calcOpen}
+        onOpenChange={setCalcOpen}
+        title="Price Calculator"
+        description="Calculate final prices with service fees and exchange rate."
+        size="xl"
+      >
+        <PriceCalculator />
       </GlassModal>
     </div>
   );

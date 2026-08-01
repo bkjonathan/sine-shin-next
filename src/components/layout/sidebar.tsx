@@ -15,7 +15,6 @@ import {
   Sparkles,
   UserCog,
   BarChart3,
-  Calculator,
   Plane,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -35,7 +34,6 @@ const navItems = [
   { href: "/expenses", label: "Expenses", icon: Receipt },
   { href: "/reports", label: "Reports", icon: BarChart3, ownerOnly: true },
   { href: "/users", label: "Users", icon: UserCog, ownerOnly: true },
-  { href: "/calculator", label: "Calculator", icon: Calculator },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 

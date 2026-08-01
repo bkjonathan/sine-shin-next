@@ -1,4 +1,4 @@
-import type { Order, OrderItem, Expense } from "@/types";
+import type { Order, OrderItem, Expense, CargoShipmentListItem } from "@/types";
 
 // ── Dashboard Order ───────────────────────────────────────────────────────────
 // Order enriched with joined/aggregated fields from DB queries
@@ -37,6 +37,25 @@ export interface DashboardStats {
   total_orders: number;
   total_customers: number;      // unique customer count
   recent_orders: DashboardOrder[];
+}
+
+// ── Cargo Overview ──────────────────────────────────────────────────────────────
+
+export interface DashboardCargoStats {
+  total_shipments: number;
+  pending: number;
+  in_transit: number;
+  arrived: number;
+  delivered: number;
+  cancelled: number;
+  total_weight: number;   // sum of item weight (kg)
+  carrier_owed: number;   // sum(weight * carrier rate) — what we owe carriers
+  receiver_owed: number;  // sum(weight * receiver rate) — what receivers owe us
+}
+
+export interface DashboardCargoData {
+  stats: DashboardCargoStats;
+  recent: CargoShipmentListItem[];
 }
 
 // ── Account Summary ───────────────────────────────────────────────────────────
