@@ -116,6 +116,9 @@ export type CargoItemWithLabels = CargoItem & {
   customerAddress: string | null;
   customerCity: string | null;
   customerDisplayId: string | null;
+  // Resolved customer id (order customer or direct customer) used to match an
+  // item against the receiver payments made by that customer.
+  receiverCustomerId: string | null;
   categoryName: string | null;
   productUrl: string | null;
 };

@@ -15,7 +15,7 @@ import { CargoInvoiceTemplate } from "@/components/cargo/CargoInvoiceTemplate";
 import { GlassButton } from "@/components/ui/glass-button";
 import { useUpdateCargoShipment } from "@/hooks/use-cargo";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
-import { calculateCargoShipmentSummary } from "@/utils/cargoCalculations";
+import { calculateCargoShipmentSummary, calculateReceiverBalancesByCustomer } from "@/utils/cargoCalculations";
 import { downloadDataUrl } from "@/utils/downloadImage";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { CARGO_STATUSES } from "@/validations/cargo.schema";
@@ -188,6 +188,8 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
   const summary = calculateCargoShipmentSummary(shipment.items, shipment.payments, shipment.expenses, shipment.exchangeRate, prefs.currencyCode);
   const carrierPayments = shipment.payments.filter((p) => p.partyType === "carrier");
   const receiverPayments = shipment.payments.filter((p) => p.partyType === "receiver");
+  // Per-customer receiver balances so each cargo item can show a paid/unpaid badge.
+  const receiverBalances = calculateReceiverBalancesByCustomer(shipment.items, shipment.payments, shipment.exchangeRate, prefs.currencyCode);
 
   return (
     <div className="space-y-6">
@@ -298,7 +300,7 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
                 {shipment.items.length} item{shipment.items.length !== 1 ? "s" : ""}
               </span>
             </div>
-            <CargoItemsSection cargoShipmentId={shipment.id} items={shipment.items} shop={shop} shipment={shipment} />
+            <CargoItemsSection cargoShipmentId={shipment.id} items={shipment.items} shop={shop} shipment={shipment} receiverBalances={receiverBalances} />
           </GlassCard>
 
           <CargoExpensesSection

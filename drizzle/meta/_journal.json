@@ -43,6 +43,13 @@
       "when": 1785715200000,
       "tag": "0005_cargo_expenses",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1785801600000,
+      "tag": "0006_widen_cargo_customer_id",
+      "breakpoints": true
     }
   ]
 }

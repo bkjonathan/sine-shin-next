@@ -15,6 +15,7 @@ import { useCargoCategories } from "@/hooks/use-cargo-categories";
 import { useAddCargoItem, useRemoveCargoItem, useUpdateCargoItem } from "@/hooks/use-cargo";
 import { useDebounce } from "@/hooks/use-debounce";
 import { calculateCargoItemAmounts } from "@/utils/cargoCalculations";
+import type { ReceiverBalance, ReceiverPaymentStatus } from "@/utils/cargoCalculations";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { CargoItemRowActions } from "@/components/cargo/cargo-item-row-actions";
@@ -25,6 +26,40 @@ interface CargoItemsSectionProps {
   items: CargoItemWithLabels[];
   shop: ShopSettings | null;
   shipment: Pick<CargoShipment, "cargoNo" | "carrierName" | "carrierPhone" | "flightNumber" | "status" | "exchangeRate" | "createdAt">;
+  // Receiver paid/owed status per customer, so each item shows whether it's paid.
+  receiverBalances: Map<string, ReceiverBalance>;
+}
+
+const RECEIVER_STATUS_META: Record<ReceiverPaymentStatus, { label: string; className: string }> = {
+  paid: { label: "Paid", className: "border-success/30 bg-success/10 text-success" },
+  partial: { label: "Partial", className: "border-warning/30 bg-warning/10 text-warning" },
+  unpaid: { label: "Unpaid", className: "border-line text-t4" },
+};
+
+function ReceiverPaidBadge({ balance, currencySymbol }: { balance: ReceiverBalance | undefined; currencySymbol: string }) {
+  if (!balance) return null;
+  const meta = RECEIVER_STATUS_META[balance.status];
+  const title =
+    balance.status === "paid"
+      ? `Receiver paid ${formatCurrency(balance.paid, currencySymbol)} in full`
+      : `Paid ${formatCurrency(balance.paid, currencySymbol)} of ${formatCurrency(balance.owed, currencySymbol)} · ${formatCurrency(balance.balance, currencySymbol)} left`;
+  return (
+    <span
+      title={title}
+      className={cn(
+        "mt-1 inline-flex w-fit items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+        meta.className
+      )}
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      {meta.label}
+      {balance.status === "partial" && (
+        <span className="font-medium normal-case tracking-normal opacity-80">
+          · {formatCurrency(balance.balance, currencySymbol)} left
+        </span>
+      )}
+    </span>
+  );
 }
 
 const WHOLE_ORDER = "__whole_order__";
@@ -201,7 +236,7 @@ function BagInlineEdit({
   );
 }
 
-export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: CargoItemsSectionProps) {
+export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, receiverBalances }: CargoItemsSectionProps) {
   const [adding, setAdding] = useState(false);
   const [source, setSource] = useState<ItemSource>("order");
   const [orderId, setOrderId] = useState("");
@@ -373,6 +408,10 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
           <div className="flex flex-col">
             <span className="text-t1">{item.customerName ?? "—"}</span>
             {item.customerPhone && <span className="text-xs text-t3">{item.customerPhone}</span>}
+            <ReceiverPaidBadge
+              balance={item.receiverCustomerId ? receiverBalances.get(item.receiverCustomerId) : undefined}
+              currencySymbol={prefs.currencySymbol}
+            />
           </div>
         </td>
         <td className="px-4 py-3 text-right text-t2">{item.weightKg.toFixed(2)} kg</td>

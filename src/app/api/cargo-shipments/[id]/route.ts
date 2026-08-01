@@ -47,6 +47,9 @@ export async function GET(
       customerAddress: sql<string | null>`coalesce(${customers.address}, ${directCustomers.address})`,
       customerCity: sql<string | null>`coalesce(${customers.city}, ${directCustomers.city})`,
       customerDisplayId: sql<string | null>`coalesce(${customers.customerId}, ${directCustomers.customerId})`,
+      // Resolved customer id (order's customer, else direct customer) — links an
+      // item to the receiver payments recorded against that same customer.
+      receiverCustomerId: sql<string | null>`coalesce(${orders.customerId}, ${cargoItems.customerId})`,
       categoryName: cargoCategories.name,
       productUrl: orderItems.productUrl,
     })

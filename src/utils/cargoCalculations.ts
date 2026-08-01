@@ -81,6 +81,55 @@ export function calculatePaymentTotals(
   return { carrierPaid, receiverPaid };
 }
 
+export type ReceiverPaymentStatus = "paid" | "partial" | "unpaid";
+
+export interface ReceiverBalance {
+  owed: number;
+  paid: number;
+  balance: number;
+  status: ReceiverPaymentStatus;
+}
+
+/**
+ * Break the receiver side down per customer so each cargo item can show whether
+ * its receiver has settled up. Payments are recorded against a customer, not an
+ * individual item, so "is this paid?" is really a per-customer question: total
+ * what a customer owes across all their items, then compare it against the
+ * receiver payments they've made. Keyed by the resolved customer id (the order's
+ * customer for order-based items, or the direct customer id).
+ */
+export function calculateReceiverBalancesByCustomer(
+  items: { receiverCustomerId: string | null; weightKg: number; receiverRatePerKg: number }[],
+  payments: Pick<CargoPayment, "partyType" | "customerId" | "amount" | "currency" | "exchangeRate">[],
+  shipmentExchangeRate: number,
+  baseCurrencyCode: string
+): Map<string, ReceiverBalance> {
+  const owed = new Map<string, number>();
+  for (const it of items) {
+    if (!it.receiverCustomerId) continue;
+    owed.set(it.receiverCustomerId, (owed.get(it.receiverCustomerId) ?? 0) + it.weightKg * it.receiverRatePerKg);
+  }
+
+  const paid = new Map<string, number>();
+  for (const p of payments) {
+    if (p.partyType !== "receiver" || !p.customerId) continue;
+    const base = convertPaymentToBase(p, shipmentExchangeRate, baseCurrencyCode);
+    paid.set(p.customerId, (paid.get(p.customerId) ?? 0) + base);
+  }
+
+  const result = new Map<string, ReceiverBalance>();
+  for (const id of new Set([...owed.keys(), ...paid.keys()])) {
+    const o = owed.get(id) ?? 0;
+    const pd = paid.get(id) ?? 0;
+    const balance = o - pd;
+    // 0.01 epsilon so floating-point dust never leaves a settled receiver stuck
+    // on "partial" or a paid-in-full one short by a fraction of a satang.
+    const status: ReceiverPaymentStatus = pd <= 0.01 ? "unpaid" : balance > 0.01 ? "partial" : "paid";
+    result.set(id, { owed: o, paid: pd, balance, status });
+  }
+  return result;
+}
+
 export function calculateCargoShipmentSummary(
   items: Pick<CargoItem, "weightKg" | "carrierRatePerKg" | "receiverRatePerKg">[],
   payments: Pick<CargoPayment, "partyType" | "amount" | "currency" | "exchangeRate">[],

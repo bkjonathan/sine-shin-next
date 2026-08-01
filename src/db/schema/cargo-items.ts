@@ -11,7 +11,8 @@ export const cargoItems = pgTable("cargo_items", {
   id: varchar("id", { length: 21 }).primaryKey(),
   cargoShipmentId: varchar("cargo_shipment_id", { length: 21 }).notNull().references(() => cargoShipments.id),
   orderId: varchar("order_id", { length: 21 }).references(() => orders.id),
-  customerId: varchar("customer_id", { length: 21 }).references(() => customers.id),
+  // text (not varchar(21)) because customers.id mixes nanoids and legacy UUIDs.
+  customerId: text("customer_id").references(() => customers.id),
   orderItemId: varchar("order_item_id", { length: 21 }).references(() => orderItems.id),
   categoryId: varchar("category_id", { length: 21 }).references(() => cargoCategories.id),
   // Free-text label for the physical bag/parcel this item was packed into

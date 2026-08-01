@@ -32,6 +32,14 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
 
+/** First+last initials for the payer avatar, e.g. "Aung Khaing Min" -> "AM". */
+function initials(name: string | null | undefined) {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export function CargoPaymentsSection({
   cargoShipmentId,
   cargoNo,
@@ -110,7 +118,7 @@ export function CargoPaymentsSection({
       </div>
 
       {payments.length > 0 && (
-        <div className="mb-4 space-y-2">
+        <div className="mb-4 space-y-1.5">
           {payments.map((p) => {
             const converted = partyType === "receiver" && p.currency.toUpperCase() !== baseCurrencyCode.toUpperCase();
             const baseAmount = convertPaymentToBase(
@@ -118,33 +126,41 @@ export function CargoPaymentsSection({
               shipmentExchangeRate,
               baseCurrencyCode,
             );
+            const payer = partyType === "receiver" ? p.customerName : carrierName;
             return (
-            <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl border border-line px-3 py-2 text-sm">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-medium text-t1">{p.amount.toLocaleString()} {p.currency}</span>
-                  {converted && (
-                    <span className="text-xs font-medium text-success">
-                      = {baseCurrencySymbol} {baseAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
-                    </span>
-                  )}
-                  {p.customerName && <span className="text-xs text-t3">{p.customerName}</span>}
-                </div>
-                <div className="flex items-center gap-2 flex-wrap text-xs text-t4">
+            <div key={p.id} className="flex items-center gap-3 rounded-xl border border-line px-3 py-2.5 transition-colors hover:bg-surface-hover">
+              {/* WHO paid — the primary identifier for this row */}
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-accent-bg text-xs font-semibold text-accent">
+                {initials(payer)}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium text-t1">
+                  {payer || <span className="text-t4">No name</span>}
+                </p>
+                <div className="mt-0.5 flex items-center gap-1.5 flex-wrap text-xs text-t4">
                   <span>{formatDate(p.paidAt)}</span>
-                  {converted && p.exchangeRate ? (
-                    <span>· @ {p.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
-                  ) : null}
                   {p.method && <span>· {p.method}</span>}
-                  {p.note && <span className="truncate">· {p.note}</span>}
+                  {p.note && <span className="truncate text-t3">· {p.note}</span>}
                 </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
+              {/* HOW MUCH — counted toward the balance, shown in base currency */}
+              <div className="shrink-0 text-right">
+                <p className="text-sm font-semibold tabular-nums text-success">
+                  {baseCurrencySymbol} {baseAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </p>
+                {converted && (
+                  <p className="text-xs tabular-nums text-t4">
+                    {p.amount.toLocaleString()} {p.currency}
+                    {p.exchangeRate ? ` · @${p.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 4 })}` : ""}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center gap-0.5 shrink-0">
                 <CargoPaymentReceiptButton
                   shop={shop}
                   cargoNo={cargoNo}
                   partyType={partyType}
-                  partyName={partyType === "receiver" ? p.customerName : carrierName}
+                  partyName={payer}
                   amount={p.amount}
                   currency={p.currency}
                   paidAt={p.paidAt}
