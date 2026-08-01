@@ -64,6 +64,23 @@ export function useUpdateOrder() {
   });
 }
 
+export function useBulkUpdateOrderStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: string }) => {
+      const { data } = await api.patch<ApiSuccess<{ count: number; ids: string[] }>>("/orders/bulk", { ids, status });
+      return data.data;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+      toast.success(`Updated ${result.count} order${result.count === 1 ? "" : "s"}`);
+    },
+    onError: () => {
+      toast.error("Failed to update orders");
+    },
+  });
+}
+
 export function useDeleteOrder() {
   const queryClient = useQueryClient();
   return useMutation({

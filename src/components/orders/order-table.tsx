@@ -4,13 +4,20 @@ import { useState } from "react";
 import { type ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/ui/data-table";
 import { GlassButton } from "@/components/ui/glass-button";
+import { GlassSelect } from "@/components/ui/glass-select";
 import { OrderStatusBadge } from "./order-status-badge";
 import { OrderPaymentReceiptButton } from "./order-payment-receipt-button";
 import { formatDate, formatCurrency } from "@/lib/utils";
-import { useDeleteOrder } from "@/hooks/use-orders";
+import { useDeleteOrder, useBulkUpdateOrderStatus } from "@/hooks/use-orders";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
-import { Pencil, Trash2, Printer } from "lucide-react";
+import { ORDER_STATUSES } from "@/validations/order.schema";
+import { Pencil, Trash2, Printer, X } from "lucide-react";
 import Link from "next/link";
+
+const STATUS_OPTIONS = ORDER_STATUSES.map((s) => ({
+  value: s,
+  label: s.charAt(0).toUpperCase() + s.slice(1),
+}));
 
 interface OrderRow {
   id: string;
@@ -35,11 +42,30 @@ interface OrderTableProps {
 
 export function OrderTable({ orders, isLoading, pageOffset = 0 }: OrderTableProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkStatus, setBulkStatus] = useState("");
   const deleteOrder = useDeleteOrder();
+  const bulkUpdate = useBulkUpdateOrderStatus();
   const { prefs } = useCurrencyPrefs();
 
   const allIds = orders.map((o) => o.id);
   const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
+  // Only count selections that are still visible on the current page.
+  const selectedIds = allIds.filter((id) => selected.has(id));
+
+  const clearSelection = () => setSelected(new Set());
+
+  const handleBulkUpdate = () => {
+    if (!bulkStatus || selectedIds.length === 0) return;
+    bulkUpdate.mutate(
+      { ids: selectedIds, status: bulkStatus },
+      {
+        onSuccess: () => {
+          clearSelection();
+          setBulkStatus("");
+        },
+      }
+    );
+  };
 
   const toggleAll = () => {
     if (allSelected) {
@@ -198,6 +224,41 @@ export function OrderTable({ orders, isLoading, pageOffset = 0 }: OrderTableProp
   ];
 
   return (
-    <DataTable columns={columns} data={orders} isLoading={isLoading} emptyMessage="No orders found" />
+    <div className="space-y-3">
+      {selectedIds.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-accent/30 bg-accent/10 px-4 py-3">
+          <span className="text-sm font-medium text-t1">
+            {selectedIds.length} selected
+          </span>
+          <div className="ml-auto flex flex-wrap items-center gap-2">
+            <div className="w-44">
+              <GlassSelect
+                value={bulkStatus}
+                onValueChange={setBulkStatus}
+                options={STATUS_OPTIONS}
+                placeholder="Set status to…"
+              />
+            </div>
+            <GlassButton
+              size="sm"
+              onClick={handleBulkUpdate}
+              disabled={!bulkStatus || bulkUpdate.isPending}
+              loading={bulkUpdate.isPending}
+            >
+              Update status
+            </GlassButton>
+            <GlassButton
+              variant="ghost"
+              size="sm"
+              onClick={clearSelection}
+              aria-label="Clear selection"
+            >
+              <X className="h-3.5 w-3.5" /> Clear
+            </GlassButton>
+          </div>
+        </div>
+      )}
+      <DataTable columns={columns} data={orders} isLoading={isLoading} emptyMessage="No orders found" />
+    </div>
   );
 }
