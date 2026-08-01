@@ -9,6 +9,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassSelect } from "@/components/ui/glass-select";
 import { GlassTextarea } from "@/components/ui/glass-textarea";
+import { CustomerCombobox } from "@/components/orders/customer-combobox";
 import { useOrders, useOrderItems } from "@/hooks/use-orders";
 import { useCargoCategories } from "@/hooks/use-cargo-categories";
 import { useAddCargoItem, useRemoveCargoItem } from "@/hooks/use-cargo";
@@ -27,6 +28,8 @@ interface CargoItemsSectionProps {
 }
 
 const WHOLE_ORDER = "__whole_order__";
+
+type ItemSource = "order" | "customer";
 
 function OrderPicker({
   value,
@@ -125,8 +128,10 @@ function OrderPicker({
 
 export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: CargoItemsSectionProps) {
   const [adding, setAdding] = useState(false);
+  const [source, setSource] = useState<ItemSource>("order");
   const [orderId, setOrderId] = useState("");
   const [orderLabel, setOrderLabel] = useState("");
+  const [customerId, setCustomerId] = useState("");
   const [itemMode, setItemMode] = useState(WHOLE_ORDER);
   const [categoryId, setCategoryId] = useState("");
   const [weightKg, setWeightKg] = useState(0);
@@ -151,10 +156,18 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
   ];
 
   function resetForm() {
-    setOrderId(""); setOrderLabel(""); setItemMode(WHOLE_ORDER);
+    setSource("order");
+    setOrderId(""); setOrderLabel(""); setCustomerId(""); setItemMode(WHOLE_ORDER);
     setCategoryId(""); setWeightKg(0); setCarrierRate(0); setReceiverRate(0);
     setNote("");
     setAdding(false);
+  }
+
+  function handleSourceChange(next: ItemSource) {
+    setSource(next);
+    // Clear the other flow's selection so we never submit both.
+    setOrderId(""); setOrderLabel(""); setCustomerId(""); setItemMode(WHOLE_ORDER);
+    setWeightKg(0);
   }
 
   function handleOrderSelect(id: string, label: string, totalWeight: number) {
@@ -184,13 +197,16 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
     }
   }
 
+  const canAdd = source === "order" ? !!orderId && weightKg > 0 : !!customerId && weightKg > 0;
+
   function handleAdd() {
-    if (!orderId || weightKg <= 0) return;
+    if (!canAdd) return;
     addItem.mutate(
       {
         cargoShipmentId,
-        orderId,
-        orderItemId: itemMode === WHOLE_ORDER ? null : itemMode,
+        orderId: source === "order" ? orderId : null,
+        customerId: source === "customer" ? customerId : null,
+        orderItemId: source === "order" && itemMode !== WHOLE_ORDER ? itemMode : null,
         categoryId: categoryId || null,
         weightKg,
         carrierRatePerKg: carrierRate,
@@ -200,6 +216,25 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
       { onSuccess: () => { resetForm(); router.refresh(); } }
     );
   }
+
+  // Weight / rate / note fields are shared by both the order and direct flows.
+  const rateFields = (
+    <>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <GlassInput label="Weight (kg)" type="number" min={0} step={0.01} value={weightKg} onChange={(e) => setWeightKg(parseFloat(e.target.value) || 0)} />
+        <GlassInput label="Carrier Rate / kg" type="number" min={0} step={0.01} value={carrierRate} onChange={(e) => setCarrierRate(parseFloat(e.target.value) || 0)} />
+        <GlassInput label="Receiver Rate / kg" type="number" min={0} step={0.01} value={receiverRate} onChange={(e) => setReceiverRate(parseFloat(e.target.value) || 0)} />
+      </div>
+      <GlassTextarea
+        label="Note"
+        rows={2}
+        maxLength={500}
+        value={note}
+        onChange={(e) => setNote(e.target.value)}
+        placeholder="Optional note — shown on the customer label"
+      />
+    </>
+  );
 
   return (
     <div className="space-y-4">
@@ -220,15 +255,27 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
             <tbody>
               {items.map((item) => {
                 const { carrierAmount, receiverAmount, profit } = calculateCargoItemAmounts(item);
-                const orderGroup = items.filter((i) => i.orderId === item.orderId);
+                // Order-based items group by order; direct-customer items each
+                // stand alone (no order to group under).
+                const groupKey = (i: CargoItemWithLabels) => i.orderId ?? `direct:${i.id}`;
+                const orderGroup = items.filter((i) => groupKey(i) === groupKey(item));
                 const groupCategoryNames = Array.from(new Set(orderGroup.map((i) => i.categoryName).filter((n): n is string => !!n)));
                 const groupTotalWeight = orderGroup.reduce((s, i) => s + i.weightKg, 0);
                 return (
                   <tr key={item.id} className="border-b border-divide last:border-0">
                     <td className="px-4 py-3 text-t1">
                       <div className="flex flex-col">
-                        <span className="font-mono text-xs">{item.orderDisplayId ?? "—"}</span>
-                        {!item.orderItemId && <span className="text-xs text-t3">Whole order</span>}
+                        {item.orderId ? (
+                          <>
+                            <span className="font-mono text-xs">{item.orderDisplayId ?? "—"}</span>
+                            {!item.orderItemId && <span className="text-xs text-t3">Whole order</span>}
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-xs font-medium text-t2">Direct</span>
+                            {item.categoryName && <span className="text-xs text-t3">{item.categoryName}</span>}
+                          </>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-t2">
@@ -281,31 +328,53 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
       {adding ? (
         <GlassCard padding="sm">
           <div className="space-y-3">
-            <OrderPicker value={orderId} label={orderLabel} onSelect={handleOrderSelect} />
-            {orderId && (
+            <div className="grid grid-cols-2 gap-1 rounded-2xl border border-line bg-surface p-1">
+              {([
+                { value: "order", label: "From Order" },
+                { value: "customer", label: "Direct from Customer" },
+              ] as const).map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSourceChange(opt.value)}
+                  className={cn(
+                    "rounded-xl px-3 py-2 text-sm font-medium transition-all",
+                    source === opt.value ? "bg-surface-hover text-t1 shadow-[var(--shadow-sm)]" : "text-t3 hover:text-t1"
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
+            {source === "order" ? (
               <>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <GlassSelect label="Ship as" value={itemMode} onValueChange={handleItemModeChange} options={itemOptions} />
-                  <GlassSelect label="Category" value={categoryId} onValueChange={handleCategoryChange} options={categoryOptions} placeholder="No category" />
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <GlassInput label="Weight (kg)" type="number" min={0} step={0.01} value={weightKg} onChange={(e) => setWeightKg(parseFloat(e.target.value) || 0)} />
-                  <GlassInput label={`Carrier Rate / kg`} type="number" min={0} step={0.01} value={carrierRate} onChange={(e) => setCarrierRate(parseFloat(e.target.value) || 0)} />
-                  <GlassInput label={`Receiver Rate / kg`} type="number" min={0} step={0.01} value={receiverRate} onChange={(e) => setReceiverRate(parseFloat(e.target.value) || 0)} />
-                </div>
-                <GlassTextarea
-                  label="Note"
-                  rows={2}
-                  maxLength={500}
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  placeholder="Optional note — shown on the customer label"
-                />
+                <OrderPicker value={orderId} label={orderLabel} onSelect={handleOrderSelect} />
+                {orderId && (
+                  <>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <GlassSelect label="Ship as" value={itemMode} onValueChange={handleItemModeChange} options={itemOptions} />
+                      <GlassSelect label="Category" value={categoryId} onValueChange={handleCategoryChange} options={categoryOptions} placeholder="No category" />
+                    </div>
+                    {rateFields}
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <CustomerCombobox value={customerId} onValueChange={setCustomerId} placeholder="Whose shipment is this?" />
+                {customerId && (
+                  <>
+                    <GlassSelect label="Category" value={categoryId} onValueChange={handleCategoryChange} options={categoryOptions} placeholder="No category" />
+                    {rateFields}
+                  </>
+                )}
               </>
             )}
+
             <div className="flex gap-2 justify-end">
               <GlassButton type="button" variant="secondary" size="sm" onClick={resetForm}>Cancel</GlassButton>
-              <GlassButton type="button" size="sm" disabled={!orderId || weightKg <= 0} loading={addItem.isPending} onClick={handleAdd}>Add Item</GlassButton>
+              <GlassButton type="button" size="sm" disabled={!canAdd} loading={addItem.isPending} onClick={handleAdd}>Add Item</GlassButton>
             </div>
           </div>
         </GlassCard>

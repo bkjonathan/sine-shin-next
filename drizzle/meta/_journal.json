@@ -22,6 +22,13 @@
       "when": 1753420800000,
       "tag": "0002_add_cargo_tables",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785542400000,
+      "tag": "0003_cargo_item_direct_customer",
+      "breakpoints": true
     }
   ]
 }

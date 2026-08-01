@@ -110,7 +110,8 @@ export async function POST(req: NextRequest) {
         items.map((item) => ({
           id: nanoid(),
           cargoShipmentId: shipmentId,
-          orderId: item.orderId,
+          orderId: item.orderId ?? null,
+          customerId: item.customerId ?? null,
           orderItemId: item.orderItemId,
           categoryId: item.categoryId,
           weightKg: item.weightKg,

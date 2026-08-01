@@ -15,16 +15,23 @@ export const createCargoCategorySchema = z.object({
 
 export const updateCargoCategorySchema = createCargoCategorySchema.partial();
 
-export const cargoItemSchema = z.object({
-  id: z.string().optional(),
-  orderId: z.string().min(1, "Order is required"),
-  orderItemId: z.string().optional().nullable(),
-  categoryId: z.string().optional().nullable(),
-  weightKg: z.number().positive("Weight must be greater than 0"),
-  carrierRatePerKg: z.number().min(0, "Rate must be non-negative"),
-  receiverRatePerKg: z.number().min(0, "Rate must be non-negative"),
-  note: z.string().max(500).optional().nullable(),
-});
+export const cargoItemSchema = z
+  .object({
+    id: z.string().optional(),
+    orderId: z.string().optional().nullable(),
+    customerId: z.string().optional().nullable(),
+    orderItemId: z.string().optional().nullable(),
+    categoryId: z.string().optional().nullable(),
+    weightKg: z.number().positive("Weight must be greater than 0"),
+    carrierRatePerKg: z.number().min(0, "Rate must be non-negative"),
+    receiverRatePerKg: z.number().min(0, "Rate must be non-negative"),
+    note: z.string().max(500).optional().nullable(),
+  })
+  // An item comes either from an order or straight from a customer.
+  .refine((d) => !!d.orderId || !!d.customerId, {
+    message: "Select an order or a customer",
+    path: ["orderId"],
+  });
 
 export const createCargoShipmentSchema = z.object({
   carrierName: z.string().max(255).optional().nullable(),

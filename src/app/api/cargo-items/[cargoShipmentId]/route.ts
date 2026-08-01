@@ -24,8 +24,9 @@ export async function POST(
     const [item] = await db.insert(cargoItems).values({
       id: nanoid(),
       cargoShipmentId,
-      orderId: parsed.data.orderId,
-      orderItemId: parsed.data.orderItemId,
+      orderId: parsed.data.orderId ?? null,
+      customerId: parsed.data.customerId ?? null,
+      orderItemId: parsed.data.orderItemId ?? null,
       categoryId: parsed.data.categoryId,
       weightKg: parsed.data.weightKg,
       carrierRatePerKg: parsed.data.carrierRatePerKg,

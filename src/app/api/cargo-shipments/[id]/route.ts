@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { cargoShipments, cargoItems, cargoPayments, cargoCategories, orders, orderItems, customers } from "@/db/schema";
-import { eq, isNull, and, desc } from "drizzle-orm";
+import { eq, isNull, and, desc, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { updateCargoShipmentSchema } from "@/validations/cargo.schema";
 import { auth } from "@/lib/auth";
 
@@ -22,11 +23,15 @@ export async function GET(
 
   if (!shipment) return NextResponse.json({ error: "Cargo shipment not found" }, { status: 404 });
 
+  // Customer data comes from the order for order-based items, or straight from
+  // the item's own customerId for direct shipments — coalesce across both.
+  const directCustomers = alias(customers, "direct_customers");
   const items = await db
     .select({
       id: cargoItems.id,
       cargoShipmentId: cargoItems.cargoShipmentId,
       orderId: cargoItems.orderId,
+      customerId: cargoItems.customerId,
       orderItemId: cargoItems.orderItemId,
       categoryId: cargoItems.categoryId,
       weightKg: cargoItems.weightKg,
@@ -37,17 +42,18 @@ export async function GET(
       updatedAt: cargoItems.updatedAt,
       deletedAt: cargoItems.deletedAt,
       orderDisplayId: orders.orderId,
-      customerName: customers.name,
-      customerPhone: customers.phone,
-      customerAddress: customers.address,
-      customerCity: customers.city,
-      customerDisplayId: customers.customerId,
+      customerName: sql<string | null>`coalesce(${customers.name}, ${directCustomers.name})`,
+      customerPhone: sql<string | null>`coalesce(${customers.phone}, ${directCustomers.phone})`,
+      customerAddress: sql<string | null>`coalesce(${customers.address}, ${directCustomers.address})`,
+      customerCity: sql<string | null>`coalesce(${customers.city}, ${directCustomers.city})`,
+      customerDisplayId: sql<string | null>`coalesce(${customers.customerId}, ${directCustomers.customerId})`,
       categoryName: cargoCategories.name,
       productUrl: orderItems.productUrl,
     })
     .from(cargoItems)
     .leftJoin(orders, eq(cargoItems.orderId, orders.id))
     .leftJoin(customers, eq(orders.customerId, customers.id))
+    .leftJoin(directCustomers, eq(cargoItems.customerId, directCustomers.id))
     .leftJoin(cargoCategories, eq(cargoItems.categoryId, cargoCategories.id))
     .leftJoin(orderItems, eq(cargoItems.orderItemId, orderItems.id))
     .where(and(eq(cargoItems.cargoShipmentId, id), isNull(cargoItems.deletedAt)))
