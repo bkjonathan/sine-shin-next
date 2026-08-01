@@ -111,6 +111,27 @@ export function useAddCargoItem() {
   });
 }
 
+type UpdateCargoItemBag =
+  | { itemId: string; bagLabel: string | null }
+  | { fromBagLabel: string; toBagLabel: string | null };
+
+export function useUpdateCargoItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ cargoShipmentId, ...body }: UpdateCargoItemBag & { cargoShipmentId: string }) => {
+      const { data } = await api.patch(`/cargo-items/${cargoShipmentId}`, body);
+      return data.data;
+    },
+    onSuccess: (_, { cargoShipmentId }) => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, cargoShipmentId] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+    },
+    onError: () => {
+      toast.error("Failed to update bag");
+    },
+  });
+}
+
 export function useRemoveCargoItem() {
   const queryClient = useQueryClient();
   return useMutation({

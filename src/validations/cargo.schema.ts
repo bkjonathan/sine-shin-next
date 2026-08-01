@@ -22,6 +22,7 @@ export const cargoItemSchema = z
     customerId: z.string().optional().nullable(),
     orderItemId: z.string().optional().nullable(),
     categoryId: z.string().optional().nullable(),
+    bagLabel: z.string().max(100).optional().nullable(),
     weightKg: z.number().positive("Weight must be greater than 0"),
     carrierRatePerKg: z.number().min(0, "Rate must be non-negative"),
     receiverRatePerKg: z.number().min(0, "Rate must be non-negative"),

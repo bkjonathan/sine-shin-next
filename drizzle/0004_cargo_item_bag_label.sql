@@ -1,0 +1,1 @@
+ALTER TABLE "cargo_items" ADD COLUMN "bag_label" varchar(100);

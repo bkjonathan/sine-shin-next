@@ -29,6 +29,13 @@
       "when": 1785542400000,
       "tag": "0003_cargo_item_direct_customer",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1785628800000,
+      "tag": "0004_cargo_item_bag_label",
+      "breakpoints": true
     }
   ]
 }

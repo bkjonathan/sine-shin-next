@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect, useId, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
-import { Search, ChevronDown, Check, Plus } from "lucide-react";
+import { Search, ChevronDown, Check, Plus, Tag, Pencil, PackageOpen } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
@@ -12,7 +12,7 @@ import { GlassTextarea } from "@/components/ui/glass-textarea";
 import { CustomerCombobox } from "@/components/orders/customer-combobox";
 import { useOrders, useOrderItems } from "@/hooks/use-orders";
 import { useCargoCategories } from "@/hooks/use-cargo-categories";
-import { useAddCargoItem, useRemoveCargoItem } from "@/hooks/use-cargo";
+import { useAddCargoItem, useRemoveCargoItem, useUpdateCargoItem } from "@/hooks/use-cargo";
 import { useDebounce } from "@/hooks/use-debounce";
 import { calculateCargoItemAmounts } from "@/utils/cargoCalculations";
 import { cn, formatCurrency } from "@/lib/utils";
@@ -126,6 +126,81 @@ function OrderPicker({
   );
 }
 
+// Click-to-edit bag label used both as a group-header (rename the whole bag)
+// and as a per-item chip (move a single item to another bag). Typing offers the
+// bags already used in this shipment as `datalist` suggestions.
+function BagInlineEdit({
+  value,
+  suggestions,
+  placeholder,
+  variant = "chip",
+  onSave,
+}: {
+  value: string | null;
+  suggestions: string[];
+  placeholder: string;
+  variant?: "chip" | "header";
+  onSave: (next: string | null) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value ?? "");
+  const listId = useId();
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (editing) requestAnimationFrame(() => inputRef.current?.focus());
+  }, [editing]);
+
+  function commit() {
+    const next = draft.trim() || null;
+    if (next !== (value ?? null)) onSave(next);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <span className="inline-flex items-center">
+        <input
+          ref={inputRef}
+          list={listId}
+          value={draft}
+          maxLength={100}
+          onChange={(e) => setDraft(e.target.value)}
+          onFocus={(e) => e.target.select()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") commit();
+            if (e.key === "Escape") { setDraft(value ?? ""); setEditing(false); }
+          }}
+          onBlur={commit}
+          placeholder={placeholder}
+          className={cn(
+            "rounded-lg border border-accent-border bg-field px-2 py-0.5 text-t1 outline-none ring-2 ring-accent-bg/60",
+            variant === "header" ? "w-44 text-sm font-semibold" : "w-28 text-xs"
+          )}
+        />
+        <datalist id={listId}>
+          {suggestions.map((s) => <option key={s} value={s} />)}
+        </datalist>
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => { setDraft(value ?? ""); setEditing(true); }}
+      className={cn(
+        "group/bag inline-flex items-center gap-1 rounded-lg px-1.5 py-0.5 -mx-1.5 transition-colors hover:bg-accent-bg/40",
+        variant === "header" ? "text-sm font-semibold text-t1" : "text-xs text-t4"
+      )}
+    >
+      <Tag className={variant === "header" ? "h-3.5 w-3.5 text-accent" : "h-3 w-3"} />
+      <span className={cn(!value && "italic")}>{value || placeholder}</span>
+      <Pencil className="h-2.5 w-2.5 text-t4 opacity-0 transition-opacity group-hover/bag:opacity-100" />
+    </button>
+  );
+}
+
 export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: CargoItemsSectionProps) {
   const [adding, setAdding] = useState(false);
   const [source, setSource] = useState<ItemSource>("order");
@@ -137,6 +212,7 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
   const [weightKg, setWeightKg] = useState(0);
   const [carrierRate, setCarrierRate] = useState(0);
   const [receiverRate, setReceiverRate] = useState(0);
+  const [bagLabel, setBagLabel] = useState("");
   const [note, setNote] = useState("");
 
   const { prefs } = useCurrencyPrefs();
@@ -144,7 +220,48 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
   const { data: orderItems } = useOrderItems(orderId || undefined);
   const addItem = useAddCargoItem();
   const removeItem = useRemoveCargoItem();
+  const updateItem = useUpdateCargoItem();
   const router = useRouter();
+
+  // Distinct bag names already used in this shipment — power the autocomplete.
+  const bagNames = Array.from(
+    new Set(items.map((i) => i.bagLabel).filter((b): b is string => !!b))
+  ).sort((a, b) => a.localeCompare(b));
+
+  // Group items by bag so packing is scannable; unbagged items fall last.
+  const bagGroups = (() => {
+    const labeled = new Map<string, CargoItemWithLabels[]>();
+    const unbagged: CargoItemWithLabels[] = [];
+    for (const it of items) {
+      if (it.bagLabel) {
+        const arr = labeled.get(it.bagLabel);
+        if (arr) arr.push(it);
+        else labeled.set(it.bagLabel, [it]);
+      } else {
+        unbagged.push(it);
+      }
+    }
+    const groups: { key: string; label: string | null; rows: CargoItemWithLabels[] }[] =
+      Array.from(labeled.entries()).map(([label, rows]) => ({ key: `bag:${label}`, label, rows }));
+    if (unbagged.length) groups.push({ key: "__no_bag__", label: null, rows: unbagged });
+    return groups;
+  })();
+  // Only worth grouping once at least one bag exists.
+  const showBagGroups = bagGroups.some((g) => g.label !== null);
+
+  function renameBag(from: string, to: string | null) {
+    updateItem.mutate(
+      { cargoShipmentId, fromBagLabel: from, toBagLabel: to },
+      { onSuccess: () => router.refresh() }
+    );
+  }
+
+  function moveItemToBag(itemId: string, bag: string | null) {
+    updateItem.mutate(
+      { cargoShipmentId, itemId, bagLabel: bag },
+      { onSuccess: () => router.refresh() }
+    );
+  }
 
   const categoryOptions = (categories ?? []).filter((c) => c.isActive).map((c) => ({ value: c.id, label: c.name }));
   const itemOptions = [
@@ -159,7 +276,7 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
     setSource("order");
     setOrderId(""); setOrderLabel(""); setCustomerId(""); setItemMode(WHOLE_ORDER);
     setCategoryId(""); setWeightKg(0); setCarrierRate(0); setReceiverRate(0);
-    setNote("");
+    setBagLabel(""); setNote("");
     setAdding(false);
   }
 
@@ -208,6 +325,7 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
         customerId: source === "customer" ? customerId : null,
         orderItemId: source === "order" && itemMode !== WHOLE_ORDER ? itemMode : null,
         categoryId: categoryId || null,
+        bagLabel: bagLabel.trim() || null,
         weightKg,
         carrierRatePerKg: carrierRate,
         receiverRatePerKg: receiverRate,
@@ -217,6 +335,83 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
     );
   }
 
+  const renderRow = (item: CargoItemWithLabels) => {
+    const { carrierAmount, receiverAmount, profit } = calculateCargoItemAmounts(item);
+    // Order-based items group by order; direct-customer items each
+    // stand alone (no order to group under).
+    const groupKey = (i: CargoItemWithLabels) => i.orderId ?? `direct:${i.id}`;
+    const orderGroup = items.filter((i) => groupKey(i) === groupKey(item));
+    const groupCategoryNames = Array.from(new Set(orderGroup.map((i) => i.categoryName).filter((n): n is string => !!n)));
+    const groupTotalWeight = orderGroup.reduce((s, i) => s + i.weightKg, 0);
+    return (
+      <tr key={item.id} className="border-b border-divide last:border-0">
+        <td className="px-4 py-3 text-t1">
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-col">
+              {item.orderId ? (
+                <>
+                  <span className="font-mono text-xs">{item.orderDisplayId ?? "—"}</span>
+                  {!item.orderItemId && <span className="text-xs text-t3">Whole order</span>}
+                </>
+              ) : (
+                <>
+                  <span className="text-xs font-medium text-t2">Direct</span>
+                  {item.categoryName && <span className="text-xs text-t3">{item.categoryName}</span>}
+                </>
+              )}
+            </div>
+            <BagInlineEdit
+              variant="chip"
+              value={item.bagLabel}
+              suggestions={bagNames}
+              placeholder="+ add to bag"
+              onSave={(next) => moveItemToBag(item.id, next)}
+            />
+          </div>
+        </td>
+        <td className="px-4 py-3 text-t2">
+          <div className="flex flex-col">
+            <span className="text-t1">{item.customerName ?? "—"}</span>
+            {item.customerPhone && <span className="text-xs text-t3">{item.customerPhone}</span>}
+          </div>
+        </td>
+        <td className="px-4 py-3 text-right text-t2">{item.weightKg.toFixed(2)} kg</td>
+        <td className="px-4 py-3 text-right text-t2">{formatCurrency(carrierAmount, prefs.currencySymbol)}</td>
+        <td className="px-4 py-3 text-right text-t2">{formatCurrency(receiverAmount, prefs.currencySymbol)}</td>
+        <td className={cn("px-4 py-3 text-right font-medium", profit >= 0 ? "text-success" : "text-danger")}>
+          {formatCurrency(profit, prefs.currencySymbol)}
+        </td>
+        <td className="px-4 py-3">
+          <div className="flex items-center justify-end">
+            <CargoItemRowActions
+              shop={shop}
+              shipment={shipment}
+              orderDisplayId={item.orderDisplayId}
+              note={item.note}
+              customer={{
+                name: item.customerName,
+                customerId: item.customerDisplayId,
+                phone: item.customerPhone,
+                address: item.customerAddress,
+                city: item.customerCity,
+              }}
+              invoiceItems={orderGroup}
+              exchangeCurrencyCode={prefs.exchangeCurrencyCode}
+              categoryNames={groupCategoryNames}
+              totalWeight={groupTotalWeight}
+              onRemove={() => {
+                const label = item.orderDisplayId ? `order ${item.orderDisplayId}` : "this item";
+                if (confirm(`Remove ${label} from the shipment?`)) {
+                  removeItem.mutate({ cargoShipmentId, itemId: item.id }, { onSuccess: () => router.refresh() });
+                }
+              }}
+            />
+          </div>
+        </td>
+      </tr>
+    );
+  };
+
   // Weight / rate / note fields are shared by both the order and direct flows.
   const rateFields = (
     <>
@@ -225,6 +420,17 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
         <GlassInput label="Carrier Rate / kg" type="number" min={0} step={0.01} value={carrierRate} onChange={(e) => setCarrierRate(parseFloat(e.target.value) || 0)} />
         <GlassInput label="Receiver Rate / kg" type="number" min={0} step={0.01} value={receiverRate} onChange={(e) => setReceiverRate(parseFloat(e.target.value) || 0)} />
       </div>
+      <GlassInput
+        label="Bag / Group"
+        list="cargo-bag-suggestions"
+        value={bagLabel}
+        onChange={(e) => setBagLabel(e.target.value)}
+        maxLength={100}
+        placeholder="e.g. Brown bag, 30kg bag — group items pushed into the same bag"
+      />
+      <datalist id="cargo-bag-suggestions">
+        {bagNames.map((b) => <option key={b} value={b} />)}
+      </datalist>
       <GlassTextarea
         label="Note"
         rows={2}
@@ -253,73 +459,55 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => {
-                const { carrierAmount, receiverAmount, profit } = calculateCargoItemAmounts(item);
-                // Order-based items group by order; direct-customer items each
-                // stand alone (no order to group under).
-                const groupKey = (i: CargoItemWithLabels) => i.orderId ?? `direct:${i.id}`;
-                const orderGroup = items.filter((i) => groupKey(i) === groupKey(item));
-                const groupCategoryNames = Array.from(new Set(orderGroup.map((i) => i.categoryName).filter((n): n is string => !!n)));
-                const groupTotalWeight = orderGroup.reduce((s, i) => s + i.weightKg, 0);
-                return (
-                  <tr key={item.id} className="border-b border-divide last:border-0">
-                    <td className="px-4 py-3 text-t1">
-                      <div className="flex flex-col">
-                        {item.orderId ? (
-                          <>
-                            <span className="font-mono text-xs">{item.orderDisplayId ?? "—"}</span>
-                            {!item.orderItemId && <span className="text-xs text-t3">Whole order</span>}
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-xs font-medium text-t2">Direct</span>
-                            {item.categoryName && <span className="text-xs text-t3">{item.categoryName}</span>}
-                          </>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-t2">
-                      <div className="flex flex-col">
-                        <span className="text-t1">{item.customerName ?? "—"}</span>
-                        {item.customerPhone && <span className="text-xs text-t3">{item.customerPhone}</span>}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-right text-t2">{item.weightKg.toFixed(2)} kg</td>
-                    <td className="px-4 py-3 text-right text-t2">{formatCurrency(carrierAmount, prefs.currencySymbol)}</td>
-                    <td className="px-4 py-3 text-right text-t2">{formatCurrency(receiverAmount, prefs.currencySymbol)}</td>
-                    <td className={cn("px-4 py-3 text-right font-medium", profit >= 0 ? "text-success" : "text-danger")}>
-                      {formatCurrency(profit, prefs.currencySymbol)}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end">
-                        <CargoItemRowActions
-                          shop={shop}
-                          shipment={shipment}
-                          orderDisplayId={item.orderDisplayId}
-                          note={item.note}
-                          customer={{
-                            name: item.customerName,
-                            customerId: item.customerDisplayId,
-                            phone: item.customerPhone,
-                            address: item.customerAddress,
-                            city: item.customerCity,
-                          }}
-                          invoiceItems={orderGroup}
-                          exchangeCurrencyCode={prefs.exchangeCurrencyCode}
-                          categoryNames={groupCategoryNames}
-                          totalWeight={groupTotalWeight}
-                          onRemove={() => {
-                            const label = item.orderDisplayId ? `order ${item.orderDisplayId}` : "this item";
-                            if (confirm(`Remove ${label} from the shipment?`)) {
-                              removeItem.mutate({ cargoShipmentId, itemId: item.id }, { onSuccess: () => router.refresh() });
-                            }
-                          }}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {!showBagGroups
+                ? items.map(renderRow)
+                : bagGroups.map((group) => {
+                    const sub = group.rows.reduce(
+                      (acc, it) => {
+                        const a = calculateCargoItemAmounts(it);
+                        acc.weight += it.weightKg;
+                        acc.carrier += a.carrierAmount;
+                        acc.receiver += a.receiverAmount;
+                        acc.profit += a.profit;
+                        return acc;
+                      },
+                      { weight: 0, carrier: 0, receiver: 0, profit: 0 }
+                    );
+                    return (
+                      <Fragment key={group.key}>
+                        <tr className="border-y border-divide bg-topbar/70">
+                          <td colSpan={2} className="px-4 py-2">
+                            <div className="flex items-center gap-2">
+                              {group.label !== null ? (
+                                <BagInlineEdit
+                                  variant="header"
+                                  value={group.label}
+                                  suggestions={bagNames.filter((b) => b !== group.label)}
+                                  placeholder="Bag name"
+                                  onSave={(next) => renameBag(group.label!, next)}
+                                />
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-t3">
+                                  <PackageOpen className="h-3.5 w-3.5" /> No bag
+                                </span>
+                              )}
+                              <span className="rounded-full bg-surface-hover px-2 py-0.5 text-[10px] font-medium text-t3">
+                                {group.rows.length} item{group.rows.length !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-t2">{sub.weight.toFixed(2)} kg</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-t2">{formatCurrency(sub.carrier, prefs.currencySymbol)}</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-t2">{formatCurrency(sub.receiver, prefs.currencySymbol)}</td>
+                          <td className={cn("px-4 py-2 text-right text-xs font-semibold", sub.profit >= 0 ? "text-success" : "text-danger")}>
+                            {formatCurrency(sub.profit, prefs.currencySymbol)}
+                          </td>
+                          <td className="px-4 py-2" />
+                        </tr>
+                        {group.rows.map(renderRow)}
+                      </Fragment>
+                    );
+                  })}
             </tbody>
           </table>
         </div>

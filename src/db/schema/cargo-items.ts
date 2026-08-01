@@ -14,6 +14,9 @@ export const cargoItems = pgTable("cargo_items", {
   customerId: varchar("customer_id", { length: 21 }).references(() => customers.id),
   orderItemId: varchar("order_item_id", { length: 21 }).references(() => orderItems.id),
   categoryId: varchar("category_id", { length: 21 }).references(() => cargoCategories.id),
+  // Free-text label for the physical bag/parcel this item was packed into
+  // (e.g. "Brown bag", "30kg bag") so items can be found during shipment.
+  bagLabel: varchar("bag_label", { length: 100 }),
   weightKg: doublePrecision("weight_kg").notNull(),
   carrierRatePerKg: doublePrecision("carrier_rate_per_kg").notNull(),
   receiverRatePerKg: doublePrecision("receiver_rate_per_kg").notNull(),

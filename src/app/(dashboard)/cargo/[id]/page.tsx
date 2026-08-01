@@ -32,6 +32,7 @@ export default async function CargoDetailPage({ params }: Props) {
         customerId: cargoItems.customerId,
         orderItemId: cargoItems.orderItemId,
         categoryId: cargoItems.categoryId,
+        bagLabel: cargoItems.bagLabel,
         weightKg: cargoItems.weightKg,
         carrierRatePerKg: cargoItems.carrierRatePerKg,
         receiverRatePerKg: cargoItems.receiverRatePerKg,
