@@ -9,6 +9,7 @@ import { GlassInput } from "@/components/ui/glass-input";
 import { CustomerCombobox } from "@/components/orders/customer-combobox";
 import { CargoPaymentReceiptButton } from "@/components/cargo/cargo-payment-receipt-button";
 import { useAddCargoPayment, useRemoveCargoPayment } from "@/hooks/use-cargo";
+import { convertPaymentToBase } from "@/utils/cargoCalculations";
 import { formatDate, cn } from "@/lib/utils";
 import type { CargoPaymentWithCustomer, ShopSettings } from "@/types";
 import type { CargoPartyType } from "@/validations/cargo.schema";
@@ -24,6 +25,7 @@ interface CargoPaymentsSectionProps {
   paid: number;
   shipmentExchangeRate: number;
   baseCurrencySymbol: string;
+  baseCurrencyCode: string;
 }
 
 function todayISO() {
@@ -41,6 +43,7 @@ export function CargoPaymentsSection({
   paid,
   shipmentExchangeRate,
   baseCurrencySymbol,
+  baseCurrencyCode,
 }: CargoPaymentsSectionProps) {
   const [adding, setAdding] = useState(false);
   const [customerId, setCustomerId] = useState("");
@@ -108,15 +111,30 @@ export function CargoPaymentsSection({
 
       {payments.length > 0 && (
         <div className="mb-4 space-y-2">
-          {payments.map((p) => (
+          {payments.map((p) => {
+            const converted = partyType === "receiver" && p.currency.toUpperCase() !== baseCurrencyCode.toUpperCase();
+            const baseAmount = convertPaymentToBase(
+              { partyType, amount: p.amount, currency: p.currency, exchangeRate: p.exchangeRate },
+              shipmentExchangeRate,
+              baseCurrencyCode,
+            );
+            return (
             <div key={p.id} className="flex items-center justify-between gap-2 rounded-xl border border-line px-3 py-2 text-sm">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-medium text-t1">{p.amount.toLocaleString()} {p.currency}</span>
+                  {converted && (
+                    <span className="text-xs font-medium text-success">
+                      = {baseCurrencySymbol} {baseAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    </span>
+                  )}
                   {p.customerName && <span className="text-xs text-t3">{p.customerName}</span>}
                 </div>
-                <div className="flex items-center gap-2 text-xs text-t4">
+                <div className="flex items-center gap-2 flex-wrap text-xs text-t4">
                   <span>{formatDate(p.paidAt)}</span>
+                  {converted && p.exchangeRate ? (
+                    <span>· @ {p.exchangeRate.toLocaleString(undefined, { maximumFractionDigits: 4 })}</span>
+                  ) : null}
                   {p.method && <span>· {p.method}</span>}
                   {p.note && <span className="truncate">· {p.note}</span>}
                 </div>
@@ -144,7 +162,8 @@ export function CargoPaymentsSection({
                 </GlassButton>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

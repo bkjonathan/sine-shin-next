@@ -50,13 +50,18 @@ function InlineText({
   const [draft, setDraft] = useState(String(value));
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Focus on enter-edit only. Keying a draft reset on `value` here would wipe
+  // the user's keystrokes whenever the parent re-renders mid-edit.
   useEffect(() => {
     if (editing) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDraft(String(value));
       requestAnimationFrame(() => inputRef.current?.focus());
     }
-  }, [editing, value]);
+  }, [editing]);
+
+  function startEditing() {
+    setDraft(String(value));
+    setEditing(true);
+  }
 
   function commit() {
     if (draft !== String(value)) onSave(draft);
@@ -77,6 +82,7 @@ function InlineText({
         min={min}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.target.select()}
         onKeyDown={(e) => {
           if (e.key === "Enter") commit();
           if (e.key === "Escape") cancel();
@@ -96,7 +102,7 @@ function InlineText({
   return (
     <button
       type="button"
-      onClick={() => setEditing(true)}
+      onClick={startEditing}
       className={cn(
         "group/inline relative inline-flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 -mx-1.5 transition-all",
         "hover:bg-accent-bg/40 cursor-pointer",
@@ -178,7 +184,7 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
     [shipment.id, initialShipment, updateShipment, router]
   );
 
-  const summary = calculateCargoShipmentSummary(shipment.items, shipment.payments, shipment.exchangeRate);
+  const summary = calculateCargoShipmentSummary(shipment.items, shipment.payments, shipment.exchangeRate, prefs.currencyCode);
   const carrierPayments = shipment.payments.filter((p) => p.partyType === "carrier");
   const receiverPayments = shipment.payments.filter((p) => p.partyType === "receiver");
 
@@ -300,6 +306,7 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
             paid={summary.carrierPaid}
             shipmentExchangeRate={shipment.exchangeRate}
             baseCurrencySymbol={prefs.currencySymbol}
+            baseCurrencyCode={prefs.currencyCode}
           />
 
           <CargoPaymentsSection
@@ -313,6 +320,7 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
             paid={summary.receiverPaid}
             shipmentExchangeRate={shipment.exchangeRate}
             baseCurrencySymbol={prefs.currencySymbol}
+            baseCurrencyCode={prefs.currencyCode}
           />
         </div>
 

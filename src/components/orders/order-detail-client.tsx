@@ -94,14 +94,19 @@ function InlineText({
   const [draft, setDraft] = useState(String(value));
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Focus the input when we enter edit mode. Note: this depends on `editing`
+  // ONLY — resetting the draft here (keyed on `value`) would clobber the user's
+  // keystrokes whenever the parent re-renders with a recomputed value mid-edit.
   useEffect(() => {
     if (editing) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setDraft(String(value));
-      // Small delay to let the input render
       requestAnimationFrame(() => inputRef.current?.focus());
     }
-  }, [editing, value]);
+  }, [editing]);
+
+  function startEditing() {
+    setDraft(String(value));
+    setEditing(true);
+  }
 
   function commit() {
     if (draft !== String(value)) {
@@ -124,6 +129,7 @@ function InlineText({
         min={min}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
+        onFocus={(e) => e.target.select()}
         onKeyDown={(e) => {
           if (e.key === "Enter") commit();
           if (e.key === "Escape") cancel();
@@ -143,7 +149,7 @@ function InlineText({
   return (
     <button
       type="button"
-      onClick={() => setEditing(true)}
+      onClick={startEditing}
       className={cn(
         "group/inline relative inline-flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 -mx-1.5 transition-all",
         "hover:bg-accent-bg/40 cursor-pointer",

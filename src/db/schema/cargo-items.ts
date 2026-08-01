@@ -1,4 +1,4 @@
-import { pgTable, varchar, timestamp, doublePrecision } from "drizzle-orm/pg-core";
+import { pgTable, varchar, timestamp, doublePrecision, text } from "drizzle-orm/pg-core";
 import { cargoShipments } from "./cargo-shipments";
 import { orders } from "./orders";
 import { orderItems } from "./order-items";
@@ -13,6 +13,7 @@ export const cargoItems = pgTable("cargo_items", {
   weightKg: doublePrecision("weight_kg").notNull(),
   carrierRatePerKg: doublePrecision("carrier_rate_per_kg").notNull(),
   receiverRatePerKg: doublePrecision("receiver_rate_per_kg").notNull(),
+  note: text("note"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }),
   deletedAt: timestamp("deleted_at", { withTimezone: true }),

@@ -23,6 +23,7 @@ export const cargoItemSchema = z.object({
   weightKg: z.number().positive("Weight must be greater than 0"),
   carrierRatePerKg: z.number().min(0, "Rate must be non-negative"),
   receiverRatePerKg: z.number().min(0, "Rate must be non-negative"),
+  note: z.string().max(500).optional().nullable(),
 });
 
 export const createCargoShipmentSchema = z.object({

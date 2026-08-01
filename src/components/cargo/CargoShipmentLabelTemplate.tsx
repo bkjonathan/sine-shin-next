@@ -7,10 +7,18 @@ import InvoiceQRCode from "@/components/invoice/InvoiceQRCode";
 interface CargoShipmentLabelTemplateProps {
   ref: RefObject<HTMLDivElement | null>;
   shop: ShopSettings | null;
-  shipment: Pick<CargoShipment, "cargoNo" | "carrierName" | "carrierPhone" | "flightNumber" | "status">;
+  shipment: Pick<CargoShipment, "cargoNo">;
   orderDisplayId: string | null;
   categoryNames: string[];
   totalWeight: number;
+  note: string | null;
+  customer: {
+    name: string | null;
+    customerId: string | null;
+    phone: string | null;
+    address: string | null;
+    city: string | null;
+  };
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -22,9 +30,22 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-function statusLabel(s: string) {
-  return s.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
-}
+const sectionLabel = {
+  fontSize: 11,
+  fontWeight: 700,
+  color: "#94a3b8",
+  textTransform: "uppercase" as const,
+  letterSpacing: "0.16em",
+  margin: "0 0 8px",
+};
+
+const cardStyle = {
+  background: "white",
+  borderRadius: 18,
+  border: "1px solid #e2e8f0",
+  padding: "6px 20px",
+  marginBottom: 20,
+};
 
 export function CargoShipmentLabelTemplate({
   ref,
@@ -33,7 +54,11 @@ export function CargoShipmentLabelTemplate({
   orderDisplayId,
   categoryNames,
   totalWeight,
+  note,
+  customer,
 }: CargoShipmentLabelTemplateProps) {
+  const hasShipmentDetails = Boolean(orderDisplayId) || categoryNames.length > 0;
+
   return (
     <div
       ref={ref}
@@ -62,23 +87,53 @@ export function CargoShipmentLabelTemplate({
       </div>
 
       <div style={{ padding: "28px 32px 32px" }}>
-        {/* ── Cargo number block ── */}
-        <p style={{ fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.16em", margin: "0 0 8px" }}>
-          Cargo No
-        </p>
-        <p style={{ fontSize: 30, fontWeight: 800, color: "#0f172a", margin: "0 0 14px", lineHeight: 1.15, fontFamily: "monospace" }}>
-          {shipment.cargoNo}
-        </p>
-
-        <div style={{ background: "white", borderRadius: 18, border: "1px solid #e2e8f0", padding: "6px 20px", marginBottom: 20 }}>
-          {orderDisplayId && <InfoRow label="Order No" value={orderDisplayId} />}
-          {shipment.carrierName && <InfoRow label="Carrier" value={shipment.carrierName} />}
-          {shipment.carrierPhone && <InfoRow label="Carrier Phone" value={shipment.carrierPhone} />}
-          {shipment.flightNumber && <InfoRow label="Flight No" value={shipment.flightNumber} />}
-          {categoryNames.length > 0 && <InfoRow label="Category" value={categoryNames.join(", ")} />}
-          <InfoRow label="Total Weight" value={`${totalWeight.toFixed(2)} kg`} />
-          <InfoRow label="Status" value={statusLabel(shipment.status)} />
+        {/* ── Top stats: Cargo No + Total Weight ── */}
+        <div style={{ display: "flex", gap: 14, marginBottom: 22 }}>
+          <div style={{ flex: 1, background: "white", borderRadius: 16, border: "1px solid #e2e8f0", padding: "16px 20px" }}>
+            <p style={sectionLabel}>Cargo No</p>
+            <p style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", margin: 0, lineHeight: 1.1, fontFamily: "monospace" }}>
+              {shipment.cargoNo}
+            </p>
+          </div>
+          <div style={{ width: 160, background: "white", borderRadius: 16, border: "1px solid #e2e8f0", padding: "16px 20px" }}>
+            <p style={sectionLabel}>Total Weight</p>
+            <p style={{ fontSize: 26, fontWeight: 800, color: "#0f172a", margin: 0, lineHeight: 1.1 }}>
+              {totalWeight.toFixed(2)}
+              <span style={{ fontSize: 14, fontWeight: 600, color: "#64748b" }}> kg</span>
+            </p>
+          </div>
         </div>
+
+        {/* ── Shipment details ── */}
+        {hasShipmentDetails && (
+          <>
+            <p style={sectionLabel}>Shipment</p>
+            <div style={cardStyle}>
+              {orderDisplayId && <InfoRow label="Order No" value={orderDisplayId} />}
+              {categoryNames.length > 0 && <InfoRow label="Category" value={categoryNames.join(", ")} />}
+            </div>
+          </>
+        )}
+
+        {/* ── Customer ── */}
+        <p style={sectionLabel}>Customer</p>
+        <p style={{ fontSize: 22, fontWeight: 800, color: "#0f172a", margin: "0 0 12px", lineHeight: 1.2 }}>
+          {customer.name ?? "—"}
+        </p>
+        <div style={cardStyle}>
+          {customer.phone && <InfoRow label="Phone" value={customer.phone} />}
+          {customer.city && <InfoRow label="City" value={customer.city} />}
+          {customer.address && <InfoRow label="Address" value={customer.address} />}
+          {customer.customerId && <InfoRow label="Customer ID" value={customer.customerId} />}
+        </div>
+
+        {/* ── Note ── */}
+        {note && (
+          <div style={{ background: "white", borderRadius: 18, border: "1px solid #e2e8f0", padding: "14px 20px", marginBottom: 20 }}>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.14em" }}>Note</p>
+            <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 500, color: "#0f172a", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{note}</p>
+          </div>
+        )}
 
         {/* ── QR + footer ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px dashed #cbd5e1", paddingTop: 20 }}>
@@ -89,7 +144,13 @@ export function CargoShipmentLabelTemplate({
           <InvoiceQRCode
             data={{
               orderId: shipment.cargoNo,
-              customer: { name: orderDisplayId, phone: shipment.carrierPhone },
+              customer: {
+                name: customer.name,
+                phone: customer.phone,
+                city: customer.city,
+                address: customer.address,
+                customer_id: customer.customerId,
+              },
             }}
             size={88}
           />

@@ -32,6 +32,7 @@ export async function GET(
       weightKg: cargoItems.weightKg,
       carrierRatePerKg: cargoItems.carrierRatePerKg,
       receiverRatePerKg: cargoItems.receiverRatePerKg,
+      note: cargoItems.note,
       createdAt: cargoItems.createdAt,
       updatedAt: cargoItems.updatedAt,
       deletedAt: cargoItems.deletedAt,

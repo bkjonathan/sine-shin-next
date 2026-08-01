@@ -30,6 +30,7 @@ export async function POST(
       weightKg: parsed.data.weightKg,
       carrierRatePerKg: parsed.data.carrierRatePerKg,
       receiverRatePerKg: parsed.data.receiverRatePerKg,
+      note: parsed.data.note ?? null,
     }).returning();
 
     return NextResponse.json({ data: item }, { status: 201 });

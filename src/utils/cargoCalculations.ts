@@ -28,24 +28,47 @@ export function calculateCargoShipmentTotals(
 }
 
 /**
+ * Convert a single payment's amount into the shipment's base currency.
+ *
+ * Receiver payments are usually made in the foreign (exchange) currency — e.g.
+ * MMK — so the amount is divided by the exchange rate (foreign units per base
+ * unit) to get back to the base currency. A payment already recorded in the
+ * base currency (e.g. THB) is taken at face value: no conversion. Carrier
+ * payments are recorded directly in the base currency.
+ */
+export function convertPaymentToBase(
+  payment: Pick<CargoPayment, "partyType" | "amount" | "currency" | "exchangeRate">,
+  shipmentExchangeRate: number,
+  baseCurrencyCode: string
+): number {
+  const isBaseCurrency = payment.currency.toUpperCase() === baseCurrencyCode.toUpperCase();
+  if (payment.partyType === "receiver" && !isBaseCurrency) {
+    const rate = payment.exchangeRate ?? shipmentExchangeRate;
+    return rate > 0 ? payment.amount / rate : 0;
+  }
+  return payment.amount;
+}
+
+/**
  * Sum payments per party, converted to base currency using each payment's own
  * exchange-rate snapshot (rates drift day to day, so a shipment-level rate
- * alone isn't accurate for money that already changed hands).
+ * alone isn't accurate for money that already changed hands). Payments recorded
+ * directly in the base currency are counted at face value.
  */
 export function calculatePaymentTotals(
-  payments: Pick<CargoPayment, "partyType" | "amount" | "exchangeRate">[],
-  shipmentExchangeRate: number
+  payments: Pick<CargoPayment, "partyType" | "amount" | "currency" | "exchangeRate">[],
+  shipmentExchangeRate: number,
+  baseCurrencyCode: string
 ) {
   let carrierPaid = 0;
   let receiverPaid = 0;
 
   for (const payment of payments) {
-    const rate = payment.exchangeRate ?? shipmentExchangeRate;
+    const base = convertPaymentToBase(payment, shipmentExchangeRate, baseCurrencyCode);
     if (payment.partyType === "receiver") {
-      // Receiver pays in MMK; convert back to base currency.
-      receiverPaid += rate > 0 ? payment.amount / rate : 0;
+      receiverPaid += base;
     } else {
-      carrierPaid += payment.amount;
+      carrierPaid += base;
     }
   }
 
@@ -54,11 +77,12 @@ export function calculatePaymentTotals(
 
 export function calculateCargoShipmentSummary(
   items: Pick<CargoItem, "weightKg" | "carrierRatePerKg" | "receiverRatePerKg">[],
-  payments: Pick<CargoPayment, "partyType" | "amount" | "exchangeRate">[],
-  shipmentExchangeRate: number
+  payments: Pick<CargoPayment, "partyType" | "amount" | "currency" | "exchangeRate">[],
+  shipmentExchangeRate: number,
+  baseCurrencyCode: string
 ) {
   const totals = calculateCargoShipmentTotals(items);
-  const { carrierPaid, receiverPaid } = calculatePaymentTotals(payments, shipmentExchangeRate);
+  const { carrierPaid, receiverPaid } = calculatePaymentTotals(payments, shipmentExchangeRate, baseCurrencyCode);
   return {
     ...totals,
     carrierPaid,

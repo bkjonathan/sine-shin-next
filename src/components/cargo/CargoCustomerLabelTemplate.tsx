@@ -8,6 +8,7 @@ interface CargoCustomerLabelTemplateProps {
   ref: RefObject<HTMLDivElement | null>;
   shop: ShopSettings | null;
   shipment: Pick<CargoShipment, "cargoNo">;
+  note: string | null;
   customer: {
     name: string | null;
     customerId: string | null;
@@ -30,6 +31,7 @@ export function CargoCustomerLabelTemplate({
   ref,
   shop,
   shipment,
+  note,
   customer,
 }: CargoCustomerLabelTemplateProps) {
   return (
@@ -74,6 +76,14 @@ export function CargoCustomerLabelTemplate({
           {customer.address && <InfoRow label="Address" value={customer.address} />}
           {customer.customerId && <InfoRow label="Customer ID" value={customer.customerId} />}
         </div>
+
+        {/* ── Note ── */}
+        {note && (
+          <div style={{ background: "white", borderRadius: 18, border: "1px solid #e2e8f0", padding: "14px 20px", marginBottom: 20 }}>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.14em" }}>Note</p>
+            <p style={{ margin: "6px 0 0", fontSize: 14, fontWeight: 500, color: "#0f172a", lineHeight: 1.45, whiteSpace: "pre-wrap" }}>{note}</p>
+          </div>
+        )}
 
         {/* ── QR + footer ── */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", borderTop: "1px dashed #cbd5e1", paddingTop: 20 }}>

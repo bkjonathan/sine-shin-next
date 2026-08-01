@@ -3,11 +3,12 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
-import { Search, ChevronDown, Check, Plus, Trash2 } from "lucide-react";
+import { Search, ChevronDown, Check, Plus } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassSelect } from "@/components/ui/glass-select";
+import { GlassTextarea } from "@/components/ui/glass-textarea";
 import { useOrders, useOrderItems } from "@/hooks/use-orders";
 import { useCargoCategories } from "@/hooks/use-cargo-categories";
 import { useAddCargoItem, useRemoveCargoItem } from "@/hooks/use-cargo";
@@ -15,9 +16,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { calculateCargoItemAmounts } from "@/utils/cargoCalculations";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
-import { CargoOrderInvoiceButton } from "@/components/cargo/cargo-order-invoice-button";
-import { CargoCustomerLabelButton } from "@/components/cargo/cargo-customer-label-button";
-import { CargoShipmentLabelButton } from "@/components/cargo/cargo-shipment-label-button";
+import { CargoItemRowActions } from "@/components/cargo/cargo-item-row-actions";
 import type { CargoItemWithLabels, ShopSettings, CargoShipment } from "@/types";
 
 interface CargoItemsSectionProps {
@@ -133,6 +132,7 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
   const [weightKg, setWeightKg] = useState(0);
   const [carrierRate, setCarrierRate] = useState(0);
   const [receiverRate, setReceiverRate] = useState(0);
+  const [note, setNote] = useState("");
 
   const { prefs } = useCurrencyPrefs();
   const { data: categories } = useCargoCategories();
@@ -153,6 +153,7 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
   function resetForm() {
     setOrderId(""); setOrderLabel(""); setItemMode(WHOLE_ORDER);
     setCategoryId(""); setWeightKg(0); setCarrierRate(0); setReceiverRate(0);
+    setNote("");
     setAdding(false);
   }
 
@@ -194,6 +195,7 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
         weightKg,
         carrierRatePerKg: carrierRate,
         receiverRatePerKg: receiverRate,
+        note: note.trim() || null,
       },
       { onSuccess: () => { resetForm(); router.refresh(); } }
     );
@@ -206,13 +208,13 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
           <table className="min-w-[760px] w-full text-sm">
             <thead>
               <tr className="border-b border-divide bg-topbar">
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.18em] text-t3">Order / Customer</th>
-                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.18em] text-t3">Category</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.18em] text-t3">Order</th>
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-[0.18em] text-t3">Customer</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-[0.18em] text-t3">Weight</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-[0.18em] text-t3">Carrier Cost</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-[0.18em] text-t3">Receiver Cost</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-[0.18em] text-t3">Profit</th>
-                <th className="px-4 py-2.5 w-28" />
+                <th className="px-4 py-2.5 w-16" />
               </tr>
             </thead>
             <tbody>
@@ -226,10 +228,15 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
                     <td className="px-4 py-3 text-t1">
                       <div className="flex flex-col">
                         <span className="font-mono text-xs">{item.orderDisplayId ?? "—"}</span>
-                        <span className="text-xs text-t3">{item.customerName ?? "—"}{!item.orderItemId && " (whole order)"}</span>
+                        {!item.orderItemId && <span className="text-xs text-t3">Whole order</span>}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-t2">{item.categoryName ?? "—"}</td>
+                    <td className="px-4 py-3 text-t2">
+                      <div className="flex flex-col">
+                        <span className="text-t1">{item.customerName ?? "—"}</span>
+                        {item.customerPhone && <span className="text-xs text-t3">{item.customerPhone}</span>}
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-right text-t2">{item.weightKg.toFixed(2)} kg</td>
                     <td className="px-4 py-3 text-right text-t2">{formatCurrency(carrierAmount, prefs.currencySymbol)}</td>
                     <td className="px-4 py-3 text-right text-t2">{formatCurrency(receiverAmount, prefs.currencySymbol)}</td>
@@ -237,24 +244,12 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
                       {formatCurrency(profit, prefs.currencySymbol)}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <CargoOrderInvoiceButton
+                      <div className="flex items-center justify-end">
+                        <CargoItemRowActions
                           shop={shop}
                           shipment={shipment}
                           orderDisplayId={item.orderDisplayId}
-                          customer={{
-                            name: item.customerName,
-                            customerId: item.customerDisplayId,
-                            phone: item.customerPhone,
-                            address: item.customerAddress,
-                          }}
-                          items={orderGroup}
-                          exchangeCurrencyCode={prefs.exchangeCurrencyCode}
-                        />
-                        <CargoCustomerLabelButton
-                          shop={shop}
-                          shipment={shipment}
-                          orderDisplayId={item.orderDisplayId}
+                          note={item.note}
                           customer={{
                             name: item.customerName,
                             customerId: item.customerDisplayId,
@@ -262,23 +257,17 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
                             address: item.customerAddress,
                             city: item.customerCity,
                           }}
-                        />
-                        <CargoShipmentLabelButton
-                          shop={shop}
-                          shipment={shipment}
-                          orderDisplayId={item.orderDisplayId}
+                          invoiceItems={orderGroup}
+                          exchangeCurrencyCode={prefs.exchangeCurrencyCode}
                           categoryNames={groupCategoryNames}
                           totalWeight={groupTotalWeight}
+                          onRemove={() => {
+                            const label = item.orderDisplayId ? `order ${item.orderDisplayId}` : "this item";
+                            if (confirm(`Remove ${label} from the shipment?`)) {
+                              removeItem.mutate({ cargoShipmentId, itemId: item.id }, { onSuccess: () => router.refresh() });
+                            }
+                          }}
                         />
-                        <GlassButton
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => removeItem.mutate({ cargoShipmentId, itemId: item.id }, { onSuccess: () => router.refresh() })}
-                          className="hover:text-danger"
-                          aria-label="Remove item"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </GlassButton>
                       </div>
                     </td>
                   </tr>
@@ -304,6 +293,14 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment }: Ca
                   <GlassInput label={`Carrier Rate / kg`} type="number" min={0} step={0.01} value={carrierRate} onChange={(e) => setCarrierRate(parseFloat(e.target.value) || 0)} />
                   <GlassInput label={`Receiver Rate / kg`} type="number" min={0} step={0.01} value={receiverRate} onChange={(e) => setReceiverRate(parseFloat(e.target.value) || 0)} />
                 </div>
+                <GlassTextarea
+                  label="Note"
+                  rows={2}
+                  maxLength={500}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="Optional note — shown on the customer label"
+                />
               </>
             )}
             <div className="flex gap-2 justify-end">
