@@ -6,6 +6,17 @@ export type CargoStatus = (typeof CARGO_STATUSES)[number];
 export const CARGO_PARTY_TYPES = ["carrier", "receiver"] as const;
 export type CargoPartyType = (typeof CARGO_PARTY_TYPES)[number];
 
+export const CARGO_EXPENSE_CATEGORIES = [
+  "customs",
+  "handling",
+  "transport",
+  "packaging",
+  "insurance",
+  "tax",
+  "other",
+] as const;
+export type CargoExpenseCategory = (typeof CARGO_EXPENSE_CATEGORIES)[number];
+
 export const createCargoCategorySchema = z.object({
   name: z.string().min(1, "Name is required").max(100),
   carrierRatePerKg: z.number().min(0, "Rate must be non-negative"),
@@ -64,9 +75,18 @@ export const cargoPaymentSchema = z
     path: ["customerId"],
   });
 
+export const cargoExpenseSchema = z.object({
+  category: z.enum(CARGO_EXPENSE_CATEGORIES),
+  description: z.string().max(255).optional().nullable(),
+  amount: z.number().positive("Amount must be greater than 0"),
+  incurredAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
+  note: z.string().max(1000).optional().nullable(),
+});
+
 export type CreateCargoCategoryInput = z.infer<typeof createCargoCategorySchema>;
 export type UpdateCargoCategoryInput = z.infer<typeof updateCargoCategorySchema>;
 export type CargoItemInput = z.infer<typeof cargoItemSchema>;
 export type CreateCargoShipmentInput = z.infer<typeof createCargoShipmentSchema>;
 export type UpdateCargoShipmentInput = z.infer<typeof updateCargoShipmentSchema>;
 export type CargoPaymentInput = z.infer<typeof cargoPaymentSchema>;
+export type CargoExpenseInput = z.infer<typeof cargoExpenseSchema>;

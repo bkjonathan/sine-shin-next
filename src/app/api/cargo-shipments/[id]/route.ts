@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { cargoShipments, cargoItems, cargoPayments, cargoCategories, orders, orderItems, customers } from "@/db/schema";
+import { cargoShipments, cargoItems, cargoPayments, cargoExpenses, cargoCategories, orders, orderItems, customers } from "@/db/schema";
 import { eq, isNull, and, desc, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { updateCargoShipmentSchema } from "@/validations/cargo.schema";
@@ -80,7 +80,13 @@ export async function GET(
     .where(and(eq(cargoPayments.cargoShipmentId, id), isNull(cargoPayments.deletedAt)))
     .orderBy(desc(cargoPayments.paidAt));
 
-  return NextResponse.json({ data: { ...shipment, items, payments } });
+  const expenses = await db
+    .select()
+    .from(cargoExpenses)
+    .where(and(eq(cargoExpenses.cargoShipmentId, id), isNull(cargoExpenses.deletedAt)))
+    .orderBy(desc(cargoExpenses.incurredAt));
+
+  return NextResponse.json({ data: { ...shipment, items, payments, expenses } });
 }
 
 export async function PATCH(

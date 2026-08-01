@@ -36,6 +36,13 @@
       "when": 1785628800000,
       "tag": "0004_cargo_item_bag_label",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785715200000,
+      "tag": "0005_cargo_expenses",
+      "breakpoints": true
     }
   ]
 }

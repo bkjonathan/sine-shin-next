@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { cargoShipments, cargoItems, cargoPayments, cargoCategories, orders, orderItems, customers, shopSettings } from "@/db/schema";
+import { cargoShipments, cargoItems, cargoPayments, cargoExpenses, cargoCategories, orders, orderItems, customers, shopSettings } from "@/db/schema";
 import { eq, isNull, and, desc, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { CargoDetailClient } from "@/components/cargo/cargo-detail-client";
@@ -23,7 +23,7 @@ export default async function CargoDetailPage({ params }: Props) {
   // Customer data comes from the order for order-based items, or straight from
   // the item's own customerId for direct shipments — coalesce across both.
   const directCustomers = alias(customers, "direct_customers");
-  const [items, payments, shop] = await Promise.all([
+  const [items, payments, expenses, shop] = await Promise.all([
     db
       .select({
         id: cargoItems.id,
@@ -77,6 +77,11 @@ export default async function CargoDetailPage({ params }: Props) {
       .leftJoin(customers, eq(cargoPayments.customerId, customers.id))
       .where(and(eq(cargoPayments.cargoShipmentId, id), isNull(cargoPayments.deletedAt)))
       .orderBy(desc(cargoPayments.paidAt)),
+    db
+      .select()
+      .from(cargoExpenses)
+      .where(and(eq(cargoExpenses.cargoShipmentId, id), isNull(cargoExpenses.deletedAt)))
+      .orderBy(desc(cargoExpenses.incurredAt)),
     db.select().from(shopSettings).limit(1).then((r) => r[0] ?? null),
   ]);
 
@@ -86,6 +91,7 @@ export default async function CargoDetailPage({ params }: Props) {
         ...shipment,
         items,
         payments: payments.map((p) => ({ ...p, partyType: p.partyType as "carrier" | "receiver" })),
+        expenses,
       }}
       shop={shop}
     />

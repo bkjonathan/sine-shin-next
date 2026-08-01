@@ -9,6 +9,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { CargoStatusBadge } from "@/components/cargo/cargo-status-badge";
 import { CargoItemsSection } from "@/components/cargo/cargo-items-section";
 import { CargoPaymentsSection } from "@/components/cargo/cargo-payments-section";
+import { CargoExpensesSection } from "@/components/cargo/cargo-expenses-section";
 import { CargoDetailActions } from "@/components/cargo/cargo-detail-actions";
 import { CargoInvoiceTemplate } from "@/components/cargo/CargoInvoiceTemplate";
 import { GlassButton } from "@/components/ui/glass-button";
@@ -184,7 +185,7 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
     [shipment.id, initialShipment, updateShipment, router]
   );
 
-  const summary = calculateCargoShipmentSummary(shipment.items, shipment.payments, shipment.exchangeRate, prefs.currencyCode);
+  const summary = calculateCargoShipmentSummary(shipment.items, shipment.payments, shipment.expenses, shipment.exchangeRate, prefs.currencyCode);
   const carrierPayments = shipment.payments.filter((p) => p.partyType === "carrier");
   const receiverPayments = shipment.payments.filter((p) => p.partyType === "receiver");
 
@@ -273,10 +274,15 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
               <TrendingUp className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-t4">Profit</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-t4">Net Profit</p>
               <p className={cn("text-lg font-bold", summary.profit >= 0 ? "text-success" : "text-danger")}>
                 {formatCurrency(summary.profit, prefs.currencySymbol)}
               </p>
+              {summary.totalExpenses > 0 && (
+                <p className="text-[10px] text-t4">
+                  Gross {formatCurrency(summary.grossProfit, prefs.currencySymbol)} · Exp {formatCurrency(summary.totalExpenses, prefs.currencySymbol)}
+                </p>
+              )}
             </div>
           </div>
         </GlassCard>
@@ -294,6 +300,15 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
             </div>
             <CargoItemsSection cargoShipmentId={shipment.id} items={shipment.items} shop={shop} shipment={shipment} />
           </GlassCard>
+
+          <CargoExpensesSection
+            cargoShipmentId={shipment.id}
+            expenses={shipment.expenses}
+            grossProfit={summary.grossProfit}
+            totalExpenses={summary.totalExpenses}
+            netProfit={summary.profit}
+            baseCurrencySymbol={prefs.currencySymbol}
+          />
 
           <CargoPaymentsSection
             cargoShipmentId={shipment.id}

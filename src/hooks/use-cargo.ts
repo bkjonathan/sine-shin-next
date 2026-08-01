@@ -8,6 +8,7 @@ import type {
   CargoShipmentListItem,
   CargoShipmentWithDetails,
   CargoPaymentWithCustomer,
+  CargoExpense,
   ListParams,
   ApiSuccess,
   PaginationMeta,
@@ -17,6 +18,7 @@ import type {
   UpdateCargoShipmentInput,
   CargoItemInput,
   CargoPaymentInput,
+  CargoExpenseInput,
 } from "@/validations/cargo.schema";
 
 const QUERY_KEY = "cargo-shipments";
@@ -193,6 +195,54 @@ export function useRemoveCargoPayment() {
     },
     onError: () => {
       toast.error("Failed to remove payment");
+    },
+  });
+}
+
+export function useCargoExpenses(cargoShipmentId: string | undefined) {
+  return useQuery({
+    queryKey: ["cargo-expenses", cargoShipmentId],
+    queryFn: async () => {
+      const { data } = await api.get<ApiSuccess<CargoExpense[]>>(`/cargo-expenses/${cargoShipmentId}`);
+      return data.data;
+    },
+    enabled: !!cargoShipmentId,
+  });
+}
+
+export function useAddCargoExpense() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ cargoShipmentId, ...expense }: CargoExpenseInput & { cargoShipmentId: string }) => {
+      const { data } = await api.post(`/cargo-expenses/${cargoShipmentId}`, expense);
+      return data.data;
+    },
+    onSuccess: (_, { cargoShipmentId }) => {
+      queryClient.invalidateQueries({ queryKey: ["cargo-expenses", cargoShipmentId] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, cargoShipmentId] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+      toast.success("Expense added");
+    },
+    onError: () => {
+      toast.error("Failed to add expense");
+    },
+  });
+}
+
+export function useRemoveCargoExpense() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ cargoShipmentId, expenseId }: { cargoShipmentId: string; expenseId: string }) => {
+      await api.delete(`/cargo-expenses/${cargoShipmentId}`, { data: { expenseId } });
+    },
+    onSuccess: (_, { cargoShipmentId }) => {
+      queryClient.invalidateQueries({ queryKey: ["cargo-expenses", cargoShipmentId] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, cargoShipmentId] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+      toast.success("Expense removed");
+    },
+    onError: () => {
+      toast.error("Failed to remove expense");
     },
   });
 }

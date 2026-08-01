@@ -10,6 +10,7 @@ import type {
   cargoShipments,
   cargoItems,
   cargoPayments,
+  cargoExpenses,
 } from "@/db/schema";
 import type { ORDER_STATUSES } from "@/validations/order.schema";
 import type { EXPENSE_CATEGORIES } from "@/validations/expense.schema";
@@ -45,6 +46,9 @@ export type NewCargoItem = InferInsertModel<typeof cargoItems>;
 
 export type CargoPayment = InferSelectModel<typeof cargoPayments>;
 export type NewCargoPayment = InferInsertModel<typeof cargoPayments>;
+
+export type CargoExpense = InferSelectModel<typeof cargoExpenses>;
+export type NewCargoExpense = InferInsertModel<typeof cargoExpenses>;
 
 // ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -124,6 +128,7 @@ export type CargoPaymentWithCustomer = Omit<CargoPayment, "partyType"> & {
 export type CargoShipmentWithDetails = CargoShipment & {
   items: CargoItemWithLabels[];
   payments: CargoPaymentWithCustomer[];
+  expenses: CargoExpense[];
 };
 
 // ── List filter params ────────────────────────────────────────────────────────
