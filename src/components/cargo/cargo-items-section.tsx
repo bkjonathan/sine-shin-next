@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useId, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
+import * as Tooltip from "@radix-ui/react-tooltip";
 import { Search, ChevronDown, Check, Plus, Tag, Pencil, PackageOpen } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
@@ -59,6 +60,63 @@ function ReceiverPaidBadge({ balance, currencySymbol }: { balance: ReceiverBalan
         </span>
       )}
     </span>
+  );
+}
+
+/**
+ * Cost cell that reveals the exchange-rate conversion on hover. Freight costs are
+ * kept in the base currency; hovering shows what the same amount is worth in the
+ * receiver's currency (base × the shipment's exchange rate), e.g. ฿ → Ks.
+ */
+function ExchangeCostCell({
+  amount,
+  label,
+  rate,
+  baseSymbol,
+  exchangeSymbol,
+  exchangeCode,
+}: {
+  amount: number;
+  label: string;
+  rate: number;
+  baseSymbol: string;
+  exchangeSymbol: string;
+  exchangeCode: string;
+}) {
+  const base = formatCurrency(amount, baseSymbol);
+  // Nothing to convert when the shipment has no distinct exchange rate.
+  if (!(rate > 0) || rate === 1) return <>{base}</>;
+
+  const converted = amount * rate;
+  return (
+    <Tooltip.Root>
+      <Tooltip.Trigger asChild>
+        <span className="cursor-help underline decoration-dotted decoration-t4/40 underline-offset-[3px]">
+          {base}
+        </span>
+      </Tooltip.Trigger>
+      <Tooltip.Portal>
+        <Tooltip.Content
+          side="top"
+          sideOffset={6}
+          className="z-50 rounded-xl border border-line bg-panel px-3 py-2.5 text-left shadow-[var(--shadow-card)] backdrop-blur-2xl"
+        >
+          <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-t4">{label}</p>
+          <div className="flex items-center justify-between gap-6 font-mono text-xs text-t2">
+            <span>{base}</span>
+            <span className="text-t4">× {rate.toFixed(4)}</span>
+          </div>
+          <div className="mt-1.5 flex items-center justify-between gap-6 border-t border-divide pt-1.5 font-mono text-xs font-semibold text-t1">
+            <span className="text-t4">=</span>
+            <span>
+              {formatCurrency(converted, exchangeSymbol)}{" "}
+              <span className="text-[10px] font-medium text-t4">{exchangeCode}</span>
+            </span>
+          </div>
+          <Tooltip.Arrow className="fill-panel" />
+        </Tooltip.Content>
+      </Tooltip.Portal>
+    </Tooltip.Root>
   );
 }
 
@@ -415,8 +473,26 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
           </div>
         </td>
         <td className="px-4 py-3 text-right text-t2">{item.weightKg.toFixed(2)} kg</td>
-        <td className="px-4 py-3 text-right text-t2">{formatCurrency(carrierAmount, prefs.currencySymbol)}</td>
-        <td className="px-4 py-3 text-right text-t2">{formatCurrency(receiverAmount, prefs.currencySymbol)}</td>
+        <td className="px-4 py-3 text-right text-t2">
+          <ExchangeCostCell
+            amount={carrierAmount}
+            label="Carrier Cost"
+            rate={shipment.exchangeRate}
+            baseSymbol={prefs.currencySymbol}
+            exchangeSymbol={prefs.exchangeCurrencySymbol}
+            exchangeCode={prefs.exchangeCurrencyCode}
+          />
+        </td>
+        <td className="px-4 py-3 text-right text-t2">
+          <ExchangeCostCell
+            amount={receiverAmount}
+            label="Receiver Cost"
+            rate={shipment.exchangeRate}
+            baseSymbol={prefs.currencySymbol}
+            exchangeSymbol={prefs.exchangeCurrencySymbol}
+            exchangeCode={prefs.exchangeCurrencyCode}
+          />
+        </td>
         <td className={cn("px-4 py-3 text-right font-medium", profit >= 0 ? "text-success" : "text-danger")}>
           {formatCurrency(profit, prefs.currencySymbol)}
         </td>
@@ -482,6 +558,7 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
   );
 
   return (
+    <Tooltip.Provider delayDuration={150} skipDelayDuration={300}>
     <div className="space-y-4">
       {items.length > 0 && (
         <div className="overflow-x-auto rounded-[24px] border border-line bg-surface shadow-[var(--shadow-sm)]">
@@ -536,8 +613,26 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
                             </div>
                           </td>
                           <td className="px-4 py-2 text-right text-xs font-semibold text-t2">{sub.weight.toFixed(2)} kg</td>
-                          <td className="px-4 py-2 text-right text-xs font-semibold text-t2">{formatCurrency(sub.carrier, prefs.currencySymbol)}</td>
-                          <td className="px-4 py-2 text-right text-xs font-semibold text-t2">{formatCurrency(sub.receiver, prefs.currencySymbol)}</td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-t2">
+                            <ExchangeCostCell
+                              amount={sub.carrier}
+                              label="Bag Carrier Cost"
+                              rate={shipment.exchangeRate}
+                              baseSymbol={prefs.currencySymbol}
+                              exchangeSymbol={prefs.exchangeCurrencySymbol}
+                              exchangeCode={prefs.exchangeCurrencyCode}
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-right text-xs font-semibold text-t2">
+                            <ExchangeCostCell
+                              amount={sub.receiver}
+                              label="Bag Receiver Cost"
+                              rate={shipment.exchangeRate}
+                              baseSymbol={prefs.currencySymbol}
+                              exchangeSymbol={prefs.exchangeCurrencySymbol}
+                              exchangeCode={prefs.exchangeCurrencyCode}
+                            />
+                          </td>
                           <td className={cn("px-4 py-2 text-right text-xs font-semibold", sub.profit >= 0 ? "text-success" : "text-danger")}>
                             {formatCurrency(sub.profit, prefs.currencySymbol)}
                           </td>
@@ -611,5 +706,6 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
         </GlassButton>
       )}
     </div>
+    </Tooltip.Provider>
   );
 }
