@@ -3,7 +3,6 @@
 import { useState, useRef, useEffect, useId, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
-import * as Tooltip from "@radix-ui/react-tooltip";
 import { Search, ChevronDown, Check, Plus, Tag, Pencil, PackageOpen } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
@@ -83,22 +82,35 @@ function ExchangeCostCell({
   exchangeSymbol: string;
   exchangeCode: string;
 }) {
+  const [open, setOpen] = useState(false);
   const base = formatCurrency(amount, baseSymbol);
   // Nothing to convert when the shipment has no distinct exchange rate.
   if (!(rate > 0) || rate === 1) return <>{base}</>;
 
   const converted = amount * rate;
   return (
-    <Tooltip.Root>
-      <Tooltip.Trigger asChild>
-        <span className="cursor-help underline decoration-dotted decoration-t4/40 underline-offset-[3px]">
+    <Popover.Root open={open} onOpenChange={setOpen}>
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          // Mouse users get it on hover; touch users tap to toggle (Radix handles
+          // the tap + tap-outside-to-dismiss). Gating the pointer handlers to
+          // "mouse" stops touch taps from also firing the hover path.
+          onPointerEnter={(e) => { if (e.pointerType === "mouse") setOpen(true); }}
+          onPointerLeave={(e) => { if (e.pointerType === "mouse") setOpen(false); }}
+          className="cursor-help underline decoration-dotted decoration-t4/40 underline-offset-[3px] outline-none"
+        >
           {base}
-        </span>
-      </Tooltip.Trigger>
-      <Tooltip.Portal>
-        <Tooltip.Content
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
           side="top"
+          align="end"
           sideOffset={6}
+          collisionPadding={12}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          onCloseAutoFocus={(e) => e.preventDefault()}
           className="z-50 rounded-xl border border-line bg-panel px-3 py-2.5 text-left shadow-[var(--shadow-card)] backdrop-blur-2xl"
         >
           <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-t4">{label}</p>
@@ -113,10 +125,10 @@ function ExchangeCostCell({
               <span className="text-[10px] font-medium text-t4">{exchangeCode}</span>
             </span>
           </div>
-          <Tooltip.Arrow className="fill-panel" />
-        </Tooltip.Content>
-      </Tooltip.Portal>
-    </Tooltip.Root>
+          <Popover.Arrow className="fill-panel" />
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 
@@ -558,7 +570,6 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
   );
 
   return (
-    <Tooltip.Provider delayDuration={150} skipDelayDuration={300}>
     <div className="space-y-4">
       {items.length > 0 && (
         <div className="overflow-x-auto rounded-[24px] border border-line bg-surface shadow-[var(--shadow-sm)]">
@@ -706,6 +717,5 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
         </GlassButton>
       )}
     </div>
-    </Tooltip.Provider>
   );
 }
