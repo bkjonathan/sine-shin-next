@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { cargoItems } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { cargoItemSchema } from "@/validations/cargo.schema";
+import { cargoItemSchema, updateCargoItemSchema } from "@/validations/cargo.schema";
 import { auth } from "@/lib/auth";
 
 export async function POST(
@@ -42,9 +42,12 @@ export async function POST(
   }
 }
 
-// PATCH updates the bag a cargo item is packed into. Two modes:
+// PATCH edits cargo items. Three modes, matched in this order:
+//   { itemId, weightKg, ...fields } → edit one item's packing/pricing fields
 //   { itemId, bagLabel }            → move a single item to a bag (null clears)
 //   { fromBagLabel, toBagLabel }    → rename a whole bag across the shipment
+// The full edit is checked first because it also carries a bagLabel, which
+// would otherwise be swallowed by the bag-move branch.
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ cargoShipmentId: string }> }
@@ -56,6 +59,33 @@ export async function PATCH(
   try {
     const body = await req.json();
     const norm = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 100) : null);
+
+    if (typeof body.itemId === "string" && "weightKg" in body) {
+      const parsed = updateCargoItemSchema.safeParse(body);
+      if (!parsed.success) {
+        return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
+      }
+
+      const [item] = await db.update(cargoItems)
+        .set({
+          categoryId: parsed.data.categoryId || null,
+          bagLabel: norm(parsed.data.bagLabel),
+          weightKg: parsed.data.weightKg,
+          carrierRatePerKg: parsed.data.carrierRatePerKg,
+          receiverRatePerKg: parsed.data.receiverRatePerKg,
+          note: parsed.data.note?.trim() || null,
+          updatedAt: new Date(),
+        })
+        .where(and(
+          eq(cargoItems.id, body.itemId),
+          eq(cargoItems.cargoShipmentId, cargoShipmentId),
+          isNull(cargoItems.deletedAt)
+        ))
+        .returning();
+
+      if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
+      return NextResponse.json({ data: item });
+    }
 
     if (typeof body.itemId === "string" && "bagLabel" in body) {
       await db.update(cargoItems)
@@ -74,7 +104,10 @@ export async function PATCH(
       return NextResponse.json({ data: { success: true } });
     }
 
-    return NextResponse.json({ error: "itemId+bagLabel or fromBagLabel+toBagLabel required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "itemId+weightKg, itemId+bagLabel, or fromBagLabel+toBagLabel required" },
+      { status: 400 }
+    );
   } catch (err) {
     console.error("[PATCH /api/cargo-items/:cargoShipmentId]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

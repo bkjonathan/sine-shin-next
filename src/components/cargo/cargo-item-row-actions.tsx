@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { MoreHorizontal, FileText, IdCard, Printer, PackageSearch, QrCode as QrCodeIcon, ExternalLink, Trash2 } from "lucide-react";
+import { MoreHorizontal, FileText, IdCard, Printer, PackageSearch, QrCode as QrCodeIcon, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { GlassButton } from "@/components/ui/glass-button";
 import { CargoOrderInvoiceTemplate } from "@/components/cargo/CargoOrderInvoiceTemplate";
 import { CargoCustomerLabelTemplate } from "@/components/cargo/CargoCustomerLabelTemplate";
@@ -41,6 +41,7 @@ interface CargoItemRowActionsProps {
   /** This row's own weight — the QR sticker labels one item, not the order. */
   itemWeightKg: number;
   bagLabel: string | null;
+  onEdit: () => void;
   onRemove: () => void;
 }
 
@@ -59,6 +60,7 @@ export function CargoItemRowActions({
   publicCode,
   itemWeightKg,
   bagLabel,
+  onEdit,
   onRemove,
 }: CargoItemRowActionsProps) {
   const [busy, setBusy] = useState<Action | null>(null);
@@ -160,6 +162,8 @@ export function CargoItemRowActions({
             sideOffset={4}
             className="z-50 min-w-[220px] overflow-hidden rounded-2xl border border-line bg-panel p-1.5 backdrop-blur-2xl shadow-[var(--shadow-card)]"
           >
+            <MenuItem icon={Pencil} label="Edit item" hint="Weight & rates" onSelect={onEdit} />
+            <div className="my-1 h-px bg-line" />
             <MenuItem icon={FileText} label="Receiving invoice" hint="Download PNG" onSelect={handleInvoice} />
             <MenuItem icon={IdCard} label="Customer label" hint="Download PNG" onSelect={handleCustomer} />
             <MenuItem icon={Printer} label="Customer label 4×6" hint="Print" onSelect={handleCustomer4x6} />

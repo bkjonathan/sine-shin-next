@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import * as Popover from "@radix-ui/react-popover";
 import { Search, ChevronDown, Check, Plus, Tag, Pencil, PackageOpen } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
+import { GlassModal } from "@/components/ui/glass-modal";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassSelect } from "@/components/ui/glass-select";
@@ -12,7 +13,7 @@ import { GlassTextarea } from "@/components/ui/glass-textarea";
 import { CustomerCombobox } from "@/components/orders/customer-combobox";
 import { useOrders, useOrderItems } from "@/hooks/use-orders";
 import { useCargoCategories } from "@/hooks/use-cargo-categories";
-import { useAddCargoItem, useRemoveCargoItem, useUpdateCargoItem } from "@/hooks/use-cargo";
+import { useAddCargoItem, useRemoveCargoItem, useUpdateCargoItem, useEditCargoItem } from "@/hooks/use-cargo";
 import { useDebounce } from "@/hooks/use-debounce";
 import { calculateCargoItemAmounts } from "@/utils/cargoCalculations";
 import type { ReceiverBalance, ReceiverPaymentStatus } from "@/utils/cargoCalculations";
@@ -320,12 +321,23 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
   const [bagLabel, setBagLabel] = useState("");
   const [note, setNote] = useState("");
 
+  // Item being edited. Only the packing/pricing fields are editable — the
+  // order or customer an item came from is fixed once it's added.
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editCategoryId, setEditCategoryId] = useState("");
+  const [editWeightKg, setEditWeightKg] = useState(0);
+  const [editCarrierRate, setEditCarrierRate] = useState(0);
+  const [editReceiverRate, setEditReceiverRate] = useState(0);
+  const [editBagLabel, setEditBagLabel] = useState("");
+  const [editNote, setEditNote] = useState("");
+
   const { prefs } = useCurrencyPrefs();
   const { data: categories } = useCargoCategories();
   const { data: orderItems } = useOrderItems(orderId || undefined);
   const addItem = useAddCargoItem();
   const removeItem = useRemoveCargoItem();
   const updateItem = useUpdateCargoItem();
+  const editItem = useEditCargoItem();
   const router = useRouter();
 
   // Distinct bag names already used in this shipment — power the autocomplete.
@@ -440,6 +452,48 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
     );
   }
 
+  // Read the row back out of `items` so the modal follows a server refresh
+  // and closes by itself if the item is removed underneath it.
+  const editingItem = editId ? items.find((i) => i.id === editId) ?? null : null;
+
+  function openEdit(item: CargoItemWithLabels) {
+    setEditId(item.id);
+    setEditCategoryId(item.categoryId ?? "");
+    setEditWeightKg(item.weightKg);
+    setEditCarrierRate(item.carrierRatePerKg);
+    setEditReceiverRate(item.receiverRatePerKg);
+    setEditBagLabel(item.bagLabel ?? "");
+    setEditNote(item.note ?? "");
+  }
+
+  // Picking a category refills the rates from its defaults, as the add form
+  // does; they stay editable afterwards.
+  function handleEditCategoryChange(id: string) {
+    setEditCategoryId(id);
+    const category = categories?.find((c) => c.id === id);
+    if (category) {
+      setEditCarrierRate(category.carrierRatePerKg);
+      setEditReceiverRate(category.receiverRatePerKg);
+    }
+  }
+
+  function handleSaveEdit() {
+    if (!editId || !(editWeightKg > 0)) return;
+    editItem.mutate(
+      {
+        cargoShipmentId,
+        itemId: editId,
+        categoryId: editCategoryId || null,
+        bagLabel: editBagLabel.trim() || null,
+        weightKg: editWeightKg,
+        carrierRatePerKg: editCarrierRate,
+        receiverRatePerKg: editReceiverRate,
+        note: editNote.trim() || null,
+      },
+      { onSuccess: () => { setEditId(null); router.refresh(); } }
+    );
+  }
+
   const renderRow = (item: CargoItemWithLabels) => {
     const { carrierAmount, receiverAmount, profit } = calculateCargoItemAmounts(item);
     // Order-based items group by order; direct-customer items each
@@ -529,6 +583,7 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
               publicCode={item.publicCode}
               itemWeightKg={item.weightKg}
               bagLabel={item.bagLabel}
+              onEdit={() => openEdit(item)}
               onRemove={() => {
                 const label = item.orderDisplayId ? `order ${item.orderDisplayId}` : "this item";
                 if (confirm(`Remove ${label} from the shipment?`)) {
@@ -719,6 +774,97 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
           <Plus className="h-3.5 w-3.5" /> Add Item
         </GlassButton>
       )}
+
+      <GlassModal
+        open={!!editingItem}
+        onOpenChange={(open) => { if (!open) setEditId(null); }}
+        title="Edit item"
+        description={
+          editingItem
+            ? `${editingItem.orderDisplayId ?? "Direct"} · ${editingItem.customerName ?? "—"}`
+            : undefined
+        }
+      >
+        <div className="space-y-3">
+          <GlassSelect
+            label="Category"
+            value={editCategoryId}
+            onValueChange={handleEditCategoryChange}
+            options={categoryOptions}
+            placeholder="No category"
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <GlassInput
+              label="Weight (kg)"
+              type="number"
+              min={0}
+              step={0.01}
+              value={editWeightKg}
+              onChange={(e) => setEditWeightKg(parseFloat(e.target.value) || 0)}
+            />
+            <GlassInput
+              label="Carrier Rate / kg"
+              type="number"
+              min={0}
+              step={0.01}
+              value={editCarrierRate}
+              onChange={(e) => setEditCarrierRate(parseFloat(e.target.value) || 0)}
+            />
+            <GlassInput
+              label="Receiver Rate / kg"
+              type="number"
+              min={0}
+              step={0.01}
+              value={editReceiverRate}
+              onChange={(e) => setEditReceiverRate(parseFloat(e.target.value) || 0)}
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
+            <div className="text-t3">
+              Carrier <span className="font-medium text-t1">{formatCurrency(editWeightKg * editCarrierRate, prefs.currencySymbol)}</span>
+              <span className="mx-2 text-t4">·</span>
+              Receiver <span className="font-medium text-t1">{formatCurrency(editWeightKg * editReceiverRate, prefs.currencySymbol)}</span>
+            </div>
+            <div className={cn("font-medium", editWeightKg * (editReceiverRate - editCarrierRate) >= 0 ? "text-success" : "text-danger")}>
+              {formatCurrency(editWeightKg * (editReceiverRate - editCarrierRate), prefs.currencySymbol)}
+            </div>
+          </div>
+
+          <GlassInput
+            label="Bag / Group"
+            list="cargo-bag-suggestions-edit"
+            value={editBagLabel}
+            onChange={(e) => setEditBagLabel(e.target.value)}
+            maxLength={100}
+            placeholder="e.g. Brown bag, 30kg bag"
+          />
+          <datalist id="cargo-bag-suggestions-edit">
+            {bagNames.map((b) => <option key={b} value={b} />)}
+          </datalist>
+          <GlassTextarea
+            label="Note"
+            rows={2}
+            maxLength={500}
+            value={editNote}
+            onChange={(e) => setEditNote(e.target.value)}
+            placeholder="Optional note — shown on the customer label"
+          />
+
+          <div className="flex justify-end gap-2">
+            <GlassButton type="button" variant="secondary" size="sm" onClick={() => setEditId(null)}>Cancel</GlassButton>
+            <GlassButton
+              type="button"
+              size="sm"
+              disabled={!(editWeightKg > 0)}
+              loading={editItem.isPending}
+              onClick={handleSaveEdit}
+            >
+              Save Changes
+            </GlassButton>
+          </div>
+        </div>
+      </GlassModal>
     </div>
   );
 }

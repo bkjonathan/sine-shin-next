@@ -17,6 +17,7 @@ import type {
   CreateCargoShipmentInput,
   UpdateCargoShipmentInput,
   CargoItemInput,
+  UpdateCargoItemInput,
   CargoPaymentInput,
   CargoExpenseInput,
 } from "@/validations/cargo.schema";
@@ -130,6 +131,25 @@ export function useUpdateCargoItem() {
     },
     onError: () => {
       toast.error("Failed to update bag");
+    },
+  });
+}
+
+/** Edits an existing item's category, bag, weight, rates and note. */
+export function useEditCargoItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ cargoShipmentId, ...body }: UpdateCargoItemInput & { cargoShipmentId: string; itemId: string }) => {
+      const { data } = await api.patch(`/cargo-items/${cargoShipmentId}`, body);
+      return data.data;
+    },
+    onSuccess: (_, { cargoShipmentId }) => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, cargoShipmentId] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
+      toast.success("Item updated");
+    },
+    onError: () => {
+      toast.error("Failed to update item");
     },
   });
 }

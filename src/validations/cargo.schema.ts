@@ -45,6 +45,17 @@ export const cargoItemSchema = z
     path: ["orderId"],
   });
 
+// Editing an item already in a shipment. Which order/customer it came from is
+// fixed at creation, so only the packing and pricing fields are editable.
+export const updateCargoItemSchema = z.object({
+  categoryId: z.string().optional().nullable(),
+  bagLabel: z.string().max(100).optional().nullable(),
+  weightKg: z.number().positive("Weight must be greater than 0"),
+  carrierRatePerKg: z.number().min(0, "Rate must be non-negative"),
+  receiverRatePerKg: z.number().min(0, "Rate must be non-negative"),
+  note: z.string().max(500).optional().nullable(),
+});
+
 export const createCargoShipmentSchema = z.object({
   carrierName: z.string().max(255).optional().nullable(),
   carrierPhone: z.string().max(50).optional().nullable(),
@@ -86,6 +97,7 @@ export const cargoExpenseSchema = z.object({
 export type CreateCargoCategoryInput = z.infer<typeof createCargoCategorySchema>;
 export type UpdateCargoCategoryInput = z.infer<typeof updateCargoCategorySchema>;
 export type CargoItemInput = z.infer<typeof cargoItemSchema>;
+export type UpdateCargoItemInput = z.infer<typeof updateCargoItemSchema>;
 export type CreateCargoShipmentInput = z.infer<typeof createCargoShipmentSchema>;
 export type UpdateCargoShipmentInput = z.infer<typeof updateCargoShipmentSchema>;
 export type CargoPaymentInput = z.infer<typeof cargoPaymentSchema>;
