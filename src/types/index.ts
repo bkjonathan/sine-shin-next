@@ -134,6 +134,55 @@ export type CargoShipmentWithDetails = CargoShipment & {
   expenses: CargoExpense[];
 };
 
+/**
+ * What the unauthenticated tracking page (`/t/<code>`) is allowed to show for a
+ * cargo item — the shipment-label facts a carrier needs in hand, and nothing
+ * else. Rates, costs, profit and payment state are deliberately absent: anyone
+ * holding the parcel can read the code off the sticker.
+ */
+export interface PublicCargoTrackingOpen {
+  state: "open";
+  publicCode: string;
+  cargoNo: string;
+  status: CargoStatus;
+  carrierName: string | null;
+  flightNumber: string | null;
+  /** ISO date strings (YYYY-MM-DD) or null when not scheduled yet. */
+  departureDate: string | null;
+  arrivalDate: string | null;
+  orderDisplayId: string | null;
+  categoryName: string | null;
+  bagLabel: string | null;
+  weightKg: number;
+  note: string | null;
+  customer: {
+    name: string | null;
+    customerId: string | null;
+    phone: string | null;
+    address: string | null;
+    city: string | null;
+  };
+}
+
+/**
+ * A delivered parcel's tracking page. The QR sticker outlives the delivery —
+ * it stays on the box, in a bin, wherever the box ends up — so once the job is
+ * done the page stops carrying consignee and carrier details entirely.
+ *
+ * Note what is *absent*: this is a separate shape rather than the open one with
+ * fields blanked, so the sensitive values cannot be sent to the browser by
+ * accident and then merely hidden in the markup.
+ */
+export interface PublicCargoTrackingClosed {
+  state: "closed";
+  publicCode: string;
+  cargoNo: string;
+  status: CargoStatus;
+  arrivalDate: string | null;
+}
+
+export type PublicCargoTracking = PublicCargoTrackingOpen | PublicCargoTrackingClosed;
+
 // ── List filter params ────────────────────────────────────────────────────────
 
 export interface ListParams {

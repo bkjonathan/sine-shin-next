@@ -123,6 +123,31 @@ export function useAddOrderItem() {
   });
 }
 
+export function useUpdateOrderItem() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      orderId,
+      itemId,
+      ...item
+    }: import("@/validations/order.schema").OrderItemInput & { orderId: string; itemId: string }) => {
+      const { data } = await api.patch<ApiSuccess<import("@/types").OrderItem>>(
+        `/order-items/${orderId}`,
+        { itemId, ...item }
+      );
+      return data.data;
+    },
+    onSuccess: (_, { orderId }) => {
+      queryClient.invalidateQueries({ queryKey: ["order-items", orderId] });
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEY, orderId] });
+      toast.success("Item updated");
+    },
+    onError: () => {
+      toast.error("Failed to update item");
+    },
+  });
+}
+
 export function useRemoveOrderItem() {
   const queryClient = useQueryClient();
   return useMutation({

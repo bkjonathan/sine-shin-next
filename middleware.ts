@@ -7,7 +7,11 @@ export default auth((req) => {
   const isLoggedIn = !!req.auth;
   const isAuthPage = pathname.startsWith("/login");
   const isApiAuthRoute = pathname.startsWith("/api/auth");
-  const isPublic = isAuthPage || isApiAuthRoute;
+  // Cargo-item tracking pages. Carriers reach these by scanning the QR on a
+  // parcel, so they cannot sign in — the unguessable code in the path is what
+  // authorises the request, and the page only exposes shipment-label facts.
+  const isTrackingPage = pathname.startsWith("/t/");
+  const isPublic = isAuthPage || isApiAuthRoute || isTrackingPage;
 
   if (!isLoggedIn && !isPublic) {
     const loginUrl = new URL("/login", req.nextUrl.origin);

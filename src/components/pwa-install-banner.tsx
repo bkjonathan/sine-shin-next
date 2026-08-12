@@ -23,6 +23,9 @@ export function PwaInstallBanner() {
     useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
+    // Public tracking pages are opened by carriers scanning a parcel — never
+    // pitch them the staff app.
+    if (window.location.pathname.startsWith("/t/")) return;
     // Already installed as standalone — never show
     if (window.matchMedia("(display-mode: standalone)").matches) return;
     // Also covers iOS "navigator.standalone"

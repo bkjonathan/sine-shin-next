@@ -50,6 +50,20 @@
       "when": 1785801600000,
       "tag": "0006_widen_cargo_customer_id",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786492800000,
+      "tag": "0007_cargo_item_public_code",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786579200000,
+      "tag": "0008_order_note",
+      "breakpoints": true
     }
   ]
 }

@@ -162,6 +162,86 @@ function InlineText({
   );
 }
 
+function InlineNote({
+  value,
+  onSave,
+}: {
+  value: string;
+  onSave: (v: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Focus with the caret at the end. Keyed on `editing` only, for the same
+  // reason as InlineText: re-seeding the draft from `value` here would wipe
+  // keystrokes whenever the parent re-renders mid-edit.
+  useEffect(() => {
+    if (editing) {
+      requestAnimationFrame(() => {
+        const el = textareaRef.current;
+        if (!el) return;
+        el.focus();
+        el.setSelectionRange(el.value.length, el.value.length);
+      });
+    }
+  }, [editing]);
+
+  function commit() {
+    const next = draft.trim();
+    if (next !== value) onSave(next);
+    setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="space-y-1.5">
+        <textarea
+          ref={textareaRef}
+          rows={4}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          // Enter inserts a newline here, so the commit keys are blur,
+          // ⌘/Ctrl+Enter and nothing else.
+          onKeyDown={(e) => {
+            if (e.key === "Escape") {
+              setDraft(value);
+              setEditing(false);
+            }
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) commit();
+          }}
+          onBlur={commit}
+          placeholder="Write a note..."
+          className={cn(
+            "w-full resize-y rounded-xl border border-accent-border bg-field px-3 py-2 text-sm text-t1 outline-none",
+            "ring-2 ring-accent-bg/60 transition-all placeholder:text-t4"
+          )}
+        />
+        <p className="text-[10px] text-t4">&#8984;/Ctrl + Enter to save &middot; Esc to cancel</p>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        setDraft(value);
+        setEditing(true);
+      }}
+      className={cn(
+        "group/note -mx-2 flex w-full items-start gap-2 rounded-xl px-2 py-1.5 text-left transition-all",
+        "hover:bg-accent-bg/40 cursor-pointer"
+      )}
+    >
+      <span className={cn("min-w-0 flex-1 whitespace-pre-wrap break-words text-sm", value ? "text-t2" : "text-t4")}>
+        {value || "Add a note..."}
+      </span>
+      <Pencil className="mt-1 h-2.5 w-2.5 shrink-0 text-t4 opacity-0 transition-opacity group-hover/note:opacity-100" />
+    </button>
+  );
+}
+
 function InlineToggle({
   checked,
   onToggle,
@@ -815,6 +895,15 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                 </div>
               </div>
             </dl>
+          </GlassCard>
+
+          {/* Note — inline editable, internal only (never on invoice/receipt) */}
+          <GlassCard>
+            <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-t3">Note</h3>
+            <InlineNote
+              value={order.note ?? ""}
+              onSave={(v) => save({ note: v || null })}
+            />
           </GlassCard>
 
           {/* Timeline — inline editable dates */}

@@ -30,10 +30,12 @@ export async function GET(
     .select({
       id: cargoItems.id,
       cargoShipmentId: cargoItems.cargoShipmentId,
+      publicCode: cargoItems.publicCode,
       orderId: cargoItems.orderId,
       customerId: cargoItems.customerId,
       orderItemId: cargoItems.orderItemId,
       categoryId: cargoItems.categoryId,
+      bagLabel: cargoItems.bagLabel,
       weightKg: cargoItems.weightKg,
       carrierRatePerKg: cargoItems.carrierRatePerKg,
       receiverRatePerKg: cargoItems.receiverRatePerKg,

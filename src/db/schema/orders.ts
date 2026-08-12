@@ -7,6 +7,7 @@ export const orders = pgTable("orders", {
   customerId: varchar("customer_id", { length: 21 }).references(() => customers.id),
   status: varchar("status", { length: 30 }).notNull().default("pending"),
   orderFrom: text("order_from"),
+  note: text("note"),
   exchangeRate: doublePrecision("exchange_rate").notNull().default(1),
   shippingFee: doublePrecision("shipping_fee").notNull().default(0),
   deliveryFee: doublePrecision("delivery_fee").notNull().default(0),

@@ -2,15 +2,19 @@
 
 import { useRef, useState } from "react";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { MoreHorizontal, FileText, IdCard, Printer, PackageSearch, Trash2 } from "lucide-react";
+import { MoreHorizontal, FileText, IdCard, Printer, PackageSearch, QrCode as QrCodeIcon, ExternalLink, Trash2 } from "lucide-react";
 import { GlassButton } from "@/components/ui/glass-button";
 import { CargoOrderInvoiceTemplate } from "@/components/cargo/CargoOrderInvoiceTemplate";
 import { CargoCustomerLabelTemplate } from "@/components/cargo/CargoCustomerLabelTemplate";
 import { CargoCustomerLabel4x6Template } from "@/components/cargo/CargoCustomerLabel4x6Template";
 import { CargoShipmentLabelTemplate } from "@/components/cargo/CargoShipmentLabelTemplate";
 import { CargoShipmentLabel4x6Template } from "@/components/cargo/CargoShipmentLabel4x6Template";
+import { CargoItemQrLabelTemplate } from "@/components/cargo/CargoItemQrLabelTemplate";
+import { QR_LABEL_PRINT_OPTIONS, QR_LABEL_RENDER_OPTIONS } from "@/components/cargo/qr-label-print";
 import { downloadDataUrl } from "@/utils/downloadImage";
 import { renderNodeToPng, printImage } from "@/utils/labelImage";
+import { usePublicOrigin } from "@/hooks/use-public-origin";
+import { trackingUrl } from "@/lib/tracking";
 import { cn } from "@/lib/utils";
 import type { ShopSettings, CargoShipment, CargoItemWithLabels } from "@/types";
 
@@ -32,10 +36,15 @@ interface CargoItemRowActionsProps {
   exchangeCurrencyCode: string;
   categoryNames: string[];
   totalWeight: number;
+  /** Tracking code behind this item's QR label and its public page. */
+  publicCode: string;
+  /** This row's own weight — the QR sticker labels one item, not the order. */
+  itemWeightKg: number;
+  bagLabel: string | null;
   onRemove: () => void;
 }
 
-type Action = "invoice" | "customer" | "customer4x6" | "shipment" | "shipmentPrint";
+type Action = "invoice" | "customer" | "customer4x6" | "shipment" | "shipmentPrint" | "qr" | "qrPrint";
 
 export function CargoItemRowActions({
   shop,
@@ -47,15 +56,21 @@ export function CargoItemRowActions({
   exchangeCurrencyCode,
   categoryNames,
   totalWeight,
+  publicCode,
+  itemWeightKg,
+  bagLabel,
   onRemove,
 }: CargoItemRowActionsProps) {
   const [busy, setBusy] = useState<Action | null>(null);
+  const origin = usePublicOrigin();
+  const trackUrl = origin ? trackingUrl(publicCode, origin) : "";
 
   const invoiceRef = useRef<HTMLDivElement>(null);
   const customerRef = useRef<HTMLDivElement>(null);
   const customer4x6Ref = useRef<HTMLDivElement>(null);
   const shipmentRef = useRef<HTMLDivElement>(null);
   const shipment4x6Ref = useRef<HTMLDivElement>(null);
+  const qrRef = useRef<HTMLDivElement>(null);
 
   const orderSuffix = orderDisplayId ?? "order";
 
@@ -90,11 +105,7 @@ export function CargoItemRowActions({
       const el = customer4x6Ref.current;
       if (!el) return;
       const dataUrl = await renderNodeToPng(el, { width: 384, height: 576, pixelRatio: 3 });
-      await printImage(dataUrl, {
-        pageCss: `@page { size: 4in 6in; margin: 0; }`,
-        imgCss: `width: 4in; height: 6in; display: block;`,
-        alt: "Customer label",
-      });
+      await printImage(dataUrl, { width: "4in", height: "6in", alt: "Customer label" });
     });
 
   const handleShipment = () =>
@@ -110,11 +121,23 @@ export function CargoItemRowActions({
       const el = shipment4x6Ref.current;
       if (!el) return;
       const dataUrl = await renderNodeToPng(el, { width: 384, height: 576, pixelRatio: 3 });
-      await printImage(dataUrl, {
-        pageCss: `@page { size: 4in 6in; margin: 0; }`,
-        imgCss: `width: 4in; height: 6in; display: block;`,
-        alt: "Shipment label",
-      });
+      await printImage(dataUrl, { width: "4in", height: "6in", alt: "Shipment label" });
+    });
+
+  const handleQr = () =>
+    run("qr", async () => {
+      const el = qrRef.current;
+      if (!el) return;
+      const dataUrl = await renderNodeToPng(el, QR_LABEL_RENDER_OPTIONS);
+      await downloadDataUrl(dataUrl, `cargo-qr-label_${shipment.cargoNo}_${publicCode}.png`);
+    });
+
+  const handleQrPrint = () =>
+    run("qrPrint", async () => {
+      const el = qrRef.current;
+      if (!el) return;
+      const dataUrl = await renderNodeToPng(el, QR_LABEL_RENDER_OPTIONS);
+      await printImage(dataUrl, QR_LABEL_PRINT_OPTIONS);
     });
 
   return (
@@ -143,6 +166,15 @@ export function CargoItemRowActions({
             <div className="my-1 h-px bg-line" />
             <MenuItem icon={PackageSearch} label="Shipment label" hint="Download PNG" onSelect={handleShipment} />
             <MenuItem icon={Printer} label="Shipment label" hint="Print" onSelect={handleShipmentPrint} />
+            <div className="my-1 h-px bg-line" />
+            <MenuItem icon={QrCodeIcon} label="QR label 35×25" hint="Download PNG" onSelect={handleQr} />
+            <MenuItem icon={Printer} label="QR label 35×25" hint="Print" onSelect={handleQrPrint} />
+            <MenuItem
+              icon={ExternalLink}
+              label="Open tracking page"
+              hint="New tab"
+              onSelect={() => trackUrl && window.open(trackUrl, "_blank", "noopener,noreferrer")}
+            />
             <div className="my-1 h-px bg-line" />
             <MenuItem icon={Trash2} label="Remove from shipment" destructive onSelect={onRemove} />
           </DropdownMenu.Content>
@@ -187,6 +219,17 @@ export function CargoItemRowActions({
         totalWeight={totalWeight}
         note={note}
         customer={customer}
+      />
+      <CargoItemQrLabelTemplate
+        ref={qrRef}
+        shop={shop}
+        shipment={shipment}
+        trackingUrl={trackUrl}
+        publicCode={publicCode}
+        orderDisplayId={orderDisplayId}
+        customerName={customer.name}
+        bagLabel={bagLabel}
+        weightKg={itemWeightKg}
       />
     </>
   );

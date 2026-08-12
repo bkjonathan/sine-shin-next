@@ -53,6 +53,52 @@ export async function POST(
   }
 }
 
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ orderId: string }> }
+) {
+  const session = await auth();
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { orderId } = await params;
+  try {
+    const { itemId, ...rest } = await req.json();
+    if (!itemId) return NextResponse.json({ error: "itemId required" }, { status: 400 });
+
+    const parsed = orderItemSchema.omit({ id: true }).safeParse(rest);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
+    }
+
+    // Only write the keys the client actually sent, so a partial edit never
+    // blanks a column it did not touch.
+    const values: Partial<typeof orderItems.$inferInsert> = { updatedAt: new Date() };
+    if ("productUrl" in rest) values.productUrl = parsed.data.productUrl;
+    if ("productQty" in rest) values.productQty = parsed.data.productQty;
+    if ("price" in rest) values.price = parsed.data.price;
+    if ("productWeight" in rest) values.productWeight = parsed.data.productWeight;
+
+    const [item] = await db
+      .update(orderItems)
+      .set(values)
+      .where(
+        and(
+          eq(orderItems.id, itemId),
+          eq(orderItems.orderId, orderId),
+          isNull(orderItems.deletedAt)
+        )
+      )
+      .returning();
+
+    if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
+
+    return NextResponse.json({ data: item });
+  } catch (err) {
+    console.error("[PATCH /api/order-items/:orderId]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ orderId: string }> }

@@ -4,12 +4,20 @@ import { orders } from "./orders";
 import { orderItems } from "./order-items";
 import { cargoCategories } from "./cargo-categories";
 import { customers } from "./customers";
+import { newCargoItemPublicCode } from "@/lib/public-code";
 
 // A cargo item is tied to EITHER an order (goods we forwarded from a purchase)
 // OR directly to a customer (goods the customer sent us to ship, with no order).
 export const cargoItems = pgTable("cargo_items", {
   id: varchar("id", { length: 21 }).primaryKey(),
   cargoShipmentId: varchar("cargo_shipment_id", { length: 21 }).notNull().references(() => cargoShipments.id),
+  // Unguessable code printed as a QR on the item's 35×25 mm label. Scanning it
+  // opens the unauthenticated tracking page at /t/<code>, so this is the only
+  // thing gating that page — it is generated randomly, never from the row id.
+  publicCode: varchar("public_code", { length: 24 })
+    .notNull()
+    .unique()
+    .$defaultFn(() => newCargoItemPublicCode()),
   orderId: varchar("order_id", { length: 21 }).references(() => orders.id),
   // text (not varchar(21)) because customers.id mixes nanoids and legacy UUIDs.
   customerId: text("customer_id").references(() => customers.id),

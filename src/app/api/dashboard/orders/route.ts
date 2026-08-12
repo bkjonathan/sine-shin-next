@@ -64,6 +64,7 @@ export async function GET(req: NextRequest) {
         customerId:       orders.customerId,
         status:           orders.status,
         orderFrom:        orders.orderFrom,
+        note:             orders.note,
         exchangeRate:     orders.exchangeRate,
         shippingFee:      orders.shippingFee,
         deliveryFee:      orders.deliveryFee,

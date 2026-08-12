@@ -526,6 +526,9 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
               exchangeCurrencyCode={prefs.exchangeCurrencyCode}
               categoryNames={groupCategoryNames}
               totalWeight={groupTotalWeight}
+              publicCode={item.publicCode}
+              itemWeightKg={item.weightKg}
+              bagLabel={item.bagLabel}
               onRemove={() => {
                 const label = item.orderDisplayId ? `order ${item.orderDisplayId}` : "this item";
                 if (confirm(`Remove ${label} from the shipment?`)) {

@@ -17,6 +17,7 @@ export const createOrderSchema = z.object({
   customerId: z.string().min(1, "Customer is required"),
   status: z.enum(ORDER_STATUSES),
   orderFrom: z.string().optional().nullable(),
+  note: z.string().optional().nullable(),
   orderDate: z.string().optional().nullable(),
   shipmentDate: z.string().optional().nullable(),
   arrivedDate: z.string().optional().nullable(),
