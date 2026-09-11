@@ -39,7 +39,7 @@
     "html-to-image": "^1.11.13",
     "lucide-react": "^1.7.0",
     "nanoid": "^5.1.7",
-    "next": "16.2.1",
+    "next": "16.2.12",
     "next-auth": "^5.0.0-beta.30",
     "postgres": "^3.4.8",
     "qrcode": "^1.5.4",
@@ -60,7 +60,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "16.2.1",
+    "eslint-config-next": "16.2.12",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5"

@@ -4,7 +4,7 @@ import { cargoShipments, cargoItems, cargoPayments, cargoExpenses, cargoCategori
 import { eq, isNull, and, desc, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { updateCargoShipmentSchema } from "@/validations/cargo.schema";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 
 export async function GET(
   _req: NextRequest,
@@ -131,6 +131,7 @@ export async function DELETE(
 ) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!roleAtLeast(session, "manager")) return forbidden();
 
   const { id } = await params;
   const [deleted] = await db.update(cargoShipments)

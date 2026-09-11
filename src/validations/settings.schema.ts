@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PASSWORD_MIN_LENGTH } from "./user.schema";
 
 export const updateSettingsSchema = z.object({
   shopName: z.string().min(1, "Shop name is required").max(255),
@@ -13,7 +14,7 @@ export const updateSettingsSchema = z.object({
 export const changePasswordSchema = z
   .object({
     currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    newPassword: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
     confirmPassword: z.string().min(1),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {

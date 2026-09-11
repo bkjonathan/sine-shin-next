@@ -2,15 +2,20 @@
  * Database seed script — creates initial admin user and shop settings.
  * Run with: npm run db:seed
  *
- * Usage: DATABASE_URL=postgresql://... npm run db:seed
+ * Usage: DATABASE_URL=postgresql://... [SEED_OWNER_PASSWORD=...] npm run db:seed
+ *
+ * The owner password comes from SEED_OWNER_PASSWORD (at least
+ * PASSWORD_MIN_LENGTH characters); if unset, a random one is generated and
+ * printed once. There is no default password (AUDIT.md F-08).
  */
-import "dotenv/config";
+import { randomBytes } from "node:crypto";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { hash } from "bcryptjs";
 import { nanoid } from "nanoid";
 import * as schema from "./schema";
 import { eq } from "drizzle-orm";
+import { PASSWORD_MIN_LENGTH } from "../validations/user.schema";
 
 async function seed() {
   const connectionString = process.env.DATABASE_URL;
@@ -48,14 +53,22 @@ async function seed() {
     .limit(1);
 
   if (existingAdmin.length === 0) {
-    const passwordHash = await hash("admin123", 12);
+    const provided = process.env.SEED_OWNER_PASSWORD;
+    if (provided !== undefined && provided.length < PASSWORD_MIN_LENGTH) {
+      throw new Error(`SEED_OWNER_PASSWORD must be at least ${PASSWORD_MIN_LENGTH} characters`);
+    }
+    const password = provided ?? randomBytes(15).toString("base64url");
+    const passwordHash = await hash(password, 12);
     await db.insert(schema.users).values({
       id: nanoid(),
       username: "admin",
       passwordHash,
       role: "owner",
     });
-    console.log("✅ Created admin user (username: admin, password: admin123)");
+    console.log("✅ Created admin user (username: admin)");
+    if (provided === undefined) {
+      console.log(`🔑 Generated password (shown once, store it now): ${password}`);
+    }
     console.log("⚠️  Change the admin password after first login!");
   } else {
     console.log("⏭️  Admin user already exists");

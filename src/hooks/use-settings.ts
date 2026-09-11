@@ -3,6 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/axios";
 import { toast } from "sonner";
+import { signOut } from "next-auth/react";
 import type { ShopSettings, ApiSuccess } from "@/types";
 import type { UpdateSettingsInput, ChangePasswordInput } from "@/validations/settings.schema";
 
@@ -41,7 +42,10 @@ export function useChangePassword() {
       await api.patch("/settings", input);
     },
     onSuccess: () => {
-      toast.success("Password changed successfully");
+      // The server ends every session on a password change, this one included
+      // (F-06), so sign out cleanly rather than fail on the next request.
+      toast.success("Password changed. Please sign in again.");
+      signOut({ callbackUrl: "/login" });
     },
     onError: () => {
       toast.error("Failed to change password");

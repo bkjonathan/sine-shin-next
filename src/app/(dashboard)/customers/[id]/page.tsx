@@ -8,12 +8,14 @@ import { CustomerStats } from "@/components/customers/customer-stats";
 import { OrderStatusBadge } from "@/components/orders/order-status-badge";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import Link from "next/link";
+import { requireSession } from "@/lib/auth";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
 export default async function CustomerDetailPage({ params }: Props) {
+  await requireSession();
   const { id } = await params;
 
   const [customer] = await db

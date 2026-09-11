@@ -7,6 +7,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { CustomerForm } from "./customer-form";
 import { useUpdateCustomer, useDeleteCustomer } from "@/hooks/use-customers";
+import { escapeHtml } from "@/lib/utils";
 import { Pencil, Trash2, Printer } from "lucide-react";
 import type { Customer } from "@/types";
 import type { CreateCustomerInput } from "@/validations/customer.schema";
@@ -30,11 +31,11 @@ export function CustomerTable({ customers, isLoading, pageOffset = 0 }: Customer
       <html><head><title>Customer Label</title>
       <style>body{font-family:sans-serif;padding:20px}h2{margin:0 0 8px}p{margin:4px 0;font-size:14px}</style>
       </head><body>
-      <h2>${c.name}</h2>
-      <p>ID: ${c.customerId}</p>
-      ${c.phone ? `<p>Phone: ${c.phone}</p>` : ""}
-      ${c.city ? `<p>City: ${c.city}</p>` : ""}
-      ${c.platform ? `<p>Platform: ${c.platform}</p>` : ""}
+      <h2>${escapeHtml(c.name)}</h2>
+      <p>ID: ${escapeHtml(c.customerId)}</p>
+      ${c.phone ? `<p>Phone: ${escapeHtml(c.phone)}</p>` : ""}
+      ${c.city ? `<p>City: ${escapeHtml(c.city)}</p>` : ""}
+      ${c.platform ? `<p>Platform: ${escapeHtml(c.platform)}</p>` : ""}
       <script>window.onload=()=>{window.print();window.close()}</script>
       </body></html>
     `);

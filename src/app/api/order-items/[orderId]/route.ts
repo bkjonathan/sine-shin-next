@@ -4,7 +4,7 @@ import { orderItems } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { orderItemSchema } from "@/validations/order.schema";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 
 export async function GET(
   _req: NextRequest,
@@ -105,6 +105,7 @@ export async function DELETE(
 ) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!roleAtLeast(session, "manager")) return forbidden();
 
   const { orderId } = await params;
   const { itemId } = await req.json();

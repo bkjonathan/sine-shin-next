@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { customers } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { updateCustomerSchema } from "@/validations/customer.schema";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 
 export async function GET(
   _req: NextRequest,
@@ -52,6 +52,7 @@ export async function DELETE(
 ) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!roleAtLeast(session, "manager")) return forbidden();
 
   const { id } = await params;
   const [deleted] = await db.update(customers)

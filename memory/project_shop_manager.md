@@ -31,5 +31,5 @@ Full Shop Management System implemented on Next.js 16.2.1 / React 19.2.4 / Tailw
 ## Setup commands
 1. Set `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXTAUTH_URL` in `.env.local`
 2. `npm run db:push` — push schema to DB (or `db:generate` + `db:migrate` for migrations)
-3. `npm run db:seed` — creates admin user (admin / admin123) and default settings
+3. `DATABASE_URL=… npm run db:seed` — creates the owner account `admin` and default settings; set `SEED_OWNER_PASSWORD`, or store the one-time password it prints
 4. `npm run dev`

@@ -4,12 +4,14 @@ import { cargoShipments, cargoItems, cargoPayments, cargoExpenses, cargoCategori
 import { eq, isNull, and, desc, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { CargoDetailClient } from "@/components/cargo/cargo-detail-client";
+import { requireSession } from "@/lib/auth";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
 export default async function CargoDetailPage({ params }: Props) {
+  await requireSession();
   const { id } = await params;
 
   const [shipment] = await db

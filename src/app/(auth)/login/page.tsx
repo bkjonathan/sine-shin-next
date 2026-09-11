@@ -39,7 +39,11 @@ function LoginForm() {
     });
 
     if (res?.error) {
-      setError("Invalid username or password");
+      setError(
+        res.code === "rate_limited"
+          ? "Too many failed sign-in attempts. Please try again in 15 minutes."
+          : "Invalid username or password"
+      );
     } else {
       router.push(callbackUrl);
       router.refresh();

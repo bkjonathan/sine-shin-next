@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { shopSettings, users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { updateSettingsSchema, changePasswordSchema } from "@/validations/settings.schema";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 import { compare, hash } from "bcryptjs";
 
 export async function GET(_req: NextRequest) {
@@ -55,10 +55,18 @@ export async function PATCH(req: NextRequest) {
       if (!match) return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
 
       const passwordHash = await hash(parsed.data.newPassword, 12);
-      await db.update(users).set({ passwordHash }).where(eq(users.id, userId));
+      // Ends every session this user has, including the current one (F-06).
+      await db
+        .update(users)
+        .set({ passwordHash, sessionVersion: sql`${users.sessionVersion} + 1` })
+        .where(eq(users.id, userId));
 
       return NextResponse.json({ data: { success: true } });
     }
+
+    // Shop-settings update (identity + ID prefixes) is owner-only; the password
+    // change above stays available to any signed-in user (AUDIT.md F-04).
+    if (!roleAtLeast(session, "owner")) return forbidden();
 
     const parsed = updateSettingsSchema.safeParse(body);
     if (!parsed.success) {

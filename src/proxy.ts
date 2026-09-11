@@ -26,6 +26,11 @@ export default auth((req) => {
   return NextResponse.next();
 });
 
+// src/proxy.ts (not middleware.ts) so it runs on Node.js: auth() re-checks the
+// user in Postgres on every request (AUDIT.md F-06), which the Edge runtime
+// cannot do. It must sit beside src/app — at the repo root, or as a
+// middleware.ts with runtime "nodejs", it builds but next start (16.2.12)
+// never invokes it, silently dropping this gate.
 export const config = {
   matcher: [
     "/((?!_next/static|_next/image|favicon\\.ico|icons/|sw\\.js|manifest\\.webmanifest|browserconfig\\.xml).*)",

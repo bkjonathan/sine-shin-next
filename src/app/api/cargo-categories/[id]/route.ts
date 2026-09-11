@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { cargoCategories } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { updateCargoCategorySchema } from "@/validations/cargo.schema";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 
 export async function PATCH(
   req: NextRequest,
@@ -11,6 +11,7 @@ export async function PATCH(
 ) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!roleAtLeast(session, "owner")) return forbidden();
 
   const { id } = await params;
   try {
@@ -40,6 +41,7 @@ export async function DELETE(
 ) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!roleAtLeast(session, "owner")) return forbidden();
 
   const { id } = await params;
   const [deleted] = await db.update(cargoCategories)

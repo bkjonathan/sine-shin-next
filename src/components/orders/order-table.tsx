@@ -7,7 +7,7 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { GlassSelect } from "@/components/ui/glass-select";
 import { OrderStatusBadge } from "./order-status-badge";
 import { OrderPaymentReceiptButton } from "./order-payment-receipt-button";
-import { formatDate, formatCurrency } from "@/lib/utils";
+import { formatDate, formatCurrency, escapeHtml } from "@/lib/utils";
 import { useDeleteOrder, useBulkUpdateOrderStatus } from "@/hooks/use-orders";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { ORDER_STATUSES } from "@/validations/order.schema";
@@ -91,11 +91,11 @@ export function OrderTable({ orders, isLoading, pageOffset = 0 }: OrderTableProp
       <html><head><title>Order Label</title>
       <style>body{font-family:sans-serif;padding:20px}h2{margin:0 0 8px}p{margin:4px 0;font-size:14px}</style>
       </head><body>
-      <h2>${o.orderId}</h2>
-      ${o.customerName ? `<p>Customer: ${o.customerName}</p>` : ""}
-      <p>Status: ${o.status}</p>
-      <p>Total: ${prefs.currencySymbol}${total.toLocaleString()}</p>
-      <p>Date: ${formatDate(o.createdAt)}</p>
+      <h2>${escapeHtml(o.orderId)}</h2>
+      ${o.customerName ? `<p>Customer: ${escapeHtml(o.customerName)}</p>` : ""}
+      <p>Status: ${escapeHtml(o.status)}</p>
+      <p>Total: ${escapeHtml(prefs.currencySymbol)}${escapeHtml(total.toLocaleString())}</p>
+      <p>Date: ${escapeHtml(formatDate(o.createdAt))}</p>
       <script>window.onload=()=>{window.print();window.close()}</script>
       </body></html>
     `);

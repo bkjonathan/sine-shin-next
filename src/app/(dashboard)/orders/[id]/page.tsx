@@ -3,12 +3,14 @@ import { db } from "@/db";
 import { orders, customers, orderItems, shopSettings } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { OrderDetailClient } from "@/components/orders/order-detail-client";
+import { requireSession } from "@/lib/auth";
 
 interface Props {
   params: Promise<{ id: string }>;
 }
 
 export default async function OrderDetailPage({ params }: Props) {
+  await requireSession();
   const { id } = await params;
   console.log(`[OrderDetail] start id=${id}`);
 

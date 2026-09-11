@@ -4,7 +4,7 @@ import { cargoItems } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { cargoItemSchema, updateCargoItemSchema } from "@/validations/cargo.schema";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
@@ -120,6 +120,7 @@ export async function DELETE(
 ) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!roleAtLeast(session, "manager")) return forbidden();
 
   const { cargoShipmentId } = await params;
   const { itemId } = await req.json();

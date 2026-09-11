@@ -8,6 +8,7 @@ import {
   type CreateUserInput,
   type UpdateUserInput,
   USER_ROLES,
+  PASSWORD_MIN_LENGTH,
 } from "@/validations/user.schema";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassButton } from "@/components/ui/glass-button";
@@ -36,6 +37,7 @@ const editUserSchema = z.object({
     .regex(/^[a-zA-Z0-9_.-]+$/, "Only letters, numbers, dots, hyphens, underscores"),
   password: z
     .string()
+    .min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`)
     .max(128, "Password must be at most 128 characters")
     .optional()
     .or(z.literal("")),

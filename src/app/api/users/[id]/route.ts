@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq, ilike, and, ne } from "drizzle-orm";
+import { eq, ilike, and, ne, sql } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { updateUserSchema } from "@/validations/user.schema";
 import { auth } from "@/lib/auth";
@@ -86,6 +86,10 @@ export async function PATCH(
     if (parsed.data.role) updateData.role = parsed.data.role;
     if (parsed.data.password && parsed.data.password.length > 0) {
       updateData.passwordHash = await hash(parsed.data.password, 12);
+    }
+    // A role or password change ends that user's existing sessions (F-06).
+    if (updateData.role || updateData.passwordHash) {
+      updateData.sessionVersion = sql`${users.sessionVersion} + 1`;
     }
 
     if (Object.keys(updateData).length === 0) {
