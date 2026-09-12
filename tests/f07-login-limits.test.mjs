@@ -177,11 +177,13 @@ test("F-07: sign-in is rate limited and doesn't reveal valid usernames", { skip:
 
   // Last: before the fix a 7-character reset succeeds and would change `user`'s password.
   await t.test("every path that sets a password rejects 7 characters", async () => {
-    await upsertUser(sql, { id: "u_owner", role: "owner" });
+    // The reset sends the owner's own password (F-18), so its 400 can only come from the length rule.
+    const ownerPassword = randomBytes(9).toString("hex");
+    await upsertUser(sql, { id: "u_owner", role: "owner", passwordHash: await bcrypt.hash(ownerPassword, 4) });
     const owner = await cookieFor("owner");
     const create = await api("POST", "/api/users", owner, { username: `f07_${tag}_new`, password: "1234567", role: "staff" });
     assert.equal(create, 400, `create user with a 7-character password: got ${create}`);
-    const reset = await api("PATCH", `/api/users/${user}`, owner, { password: "1234567" });
+    const reset = await api("PATCH", `/api/users/${user}`, owner, { password: "1234567", currentPassword: ownerPassword });
     assert.equal(reset, 400, `owner reset to a 7-character password: got ${reset}`);
 
     const self = `f07_${tag}_self`;

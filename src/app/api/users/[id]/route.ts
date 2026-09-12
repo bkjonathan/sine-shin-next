@@ -3,8 +3,8 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq, ilike, and, ne, sql } from "drizzle-orm";
 import { hash } from "bcryptjs";
-import { updateUserSchema } from "@/validations/user.schema";
-import { auth } from "@/lib/auth";
+import { updateUserSchema, deleteUserSchema } from "@/validations/user.schema";
+import { auth, verifyOwnPassword } from "@/lib/auth";
 import { withAudit } from "@/lib/audit";
 
 export async function GET(
@@ -61,6 +61,13 @@ export async function PATCH(
         { error: "Cannot change your own role" },
         { status: 400 }
       );
+    }
+
+    // A password reset or role change needs the acting owner's own password, even
+    // on their own account; a rename doesn't (AUDIT.md F-18).
+    if (parsed.data.password || parsed.data.role) {
+      const refused = await verifyOwnPassword(session, parsed.data.currentPassword);
+      if (refused) return refused;
     }
 
     // Check username uniqueness if updating
@@ -132,6 +139,15 @@ export async function DELETE(
   if (session.user?.id === id) {
     return NextResponse.json({ error: "Cannot delete yourself" }, { status: 400 });
   }
+
+  // Deleting a user needs the acting owner's own password, sent as a JSON body;
+  // a request without one is treated as missing it (AUDIT.md F-18).
+  const parsed = deleteUserSchema.safeParse(await req.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
+  }
+  const refused = await verifyOwnPassword(session, parsed.data.currentPassword);
+  if (refused) return refused;
 
   const [deleted] = await withAudit(req, session, (tx) =>
     tx.delete(users).where(eq(users.id, id)).returning({ id: users.id }));

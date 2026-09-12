@@ -150,3 +150,35 @@ export function roleAtLeast(session: Session | null, min: Role): boolean {
 export function forbidden() {
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }
+
+// Wrong entries of a signed-in user's own password are limited per account, as
+// sign-in is, so a stolen session can't be used to guess it (AUDIT.md F-18).
+const ownPasswordFailures = createAttemptLimiter({ maxFailures: 5, windowMs: LOGIN_WINDOW_MS, blockMs: LOGIN_WINDOW_MS });
+
+/**
+ * Checks the signed-in user's own password before a sensitive change: a password
+ * reset, role change or delete on the Users page, or changing your own password
+ * in Settings (AUDIT.md F-18). Returns null when it matches; otherwise the
+ * response to send — 400 when it's missing or wrong, 429 once this account has
+ * had 5 wrong entries within 15 minutes. A correct entry clears the count.
+ */
+export async function verifyOwnPassword(session: Session, password: string | undefined) {
+  const userId = session.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (ownPasswordFailures.isBlocked(userId)) {
+    return NextResponse.json({ error: "Too many incorrect password attempts. Try again later." }, { status: 429 });
+  }
+  if (!password) {
+    return NextResponse.json({ error: "Enter your current password to confirm this change" }, { status: 400 });
+  }
+
+  // Counted before the check and cleared on success, so simultaneous guesses
+  // can't all start before the limit is reached.
+  ownPasswordFailures.recordFailure(userId);
+  const [user] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || !(await compare(password, user.passwordHash))) {
+    return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
+  }
+  ownPasswordFailures.reset(userId);
+  return null;
+}

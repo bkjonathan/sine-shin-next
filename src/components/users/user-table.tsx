@@ -7,7 +7,8 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { GlassBadge } from "@/components/ui/glass-badge";
 import { UserForm } from "./user-form";
-import { useUpdateUser, useDeleteUser } from "@/hooks/use-users";
+import { DeleteUserModal } from "./delete-user-modal";
+import { useUpdateUser } from "@/hooks/use-users";
 import { Pencil, Trash2, Shield, UserCog, User } from "lucide-react";
 import type { UpdateUserInput } from "@/validations/user.schema";
 
@@ -33,8 +34,8 @@ const ROLE_CONFIG: Record<string, { label: string; variant: "default" | "info" |
 
 export function UserTable({ users, isLoading, pageOffset = 0, currentUserId }: UserTableProps) {
   const [editing, setEditing] = useState<UserListItem | null>(null);
+  const [deleting, setDeleting] = useState<UserListItem | null>(null);
   const updateUser = useUpdateUser();
-  const deleteUser = useDeleteUser();
 
   const columns: ColumnDef<UserListItem>[] = [
     {
@@ -112,9 +113,7 @@ export function UserTable({ users, isLoading, pageOffset = 0, currentUserId }: U
               variant="ghost"
               size="sm"
               onClick={() => {
-                if (isSelf) return;
-                if (confirm(`Delete user "${row.original.username}"?`))
-                  deleteUser.mutate(row.original.id);
+                if (!isSelf) setDeleting(row.original);
               }}
               aria-label="Delete user"
               className={isSelf ? "opacity-30 cursor-not-allowed" : "hover:text-danger"}
@@ -147,6 +146,8 @@ export function UserTable({ users, isLoading, pageOffset = 0, currentUserId }: U
           />
         )}
       </GlassModal>
+
+      <DeleteUserModal user={deleting} onClose={() => setDeleting(null)} />
     </>
   );
 }

@@ -51,7 +51,9 @@ async function probe(cookie) {
 test("F-06: sessions are re-checked against the users table and revocable", { skip: liveReady ? false : skipReason }, async (t) => {
   const sql = auditDb();
   t.after(() => sql.end());
-  await upsertUser(sql, { id: OWNER, role: "owner" });
+  // Deletes, role changes and password resets need the owner's own password (F-18).
+  const ownerPassword = randomBytes(9).toString("hex");
+  await upsertUser(sql, { id: OWNER, role: "owner", passwordHash: await bcrypt.hash(ownerPassword, 4) });
   const owner = await cookieFor("owner", { id: OWNER });
 
   await t.test("control: a current session is accepted", async () => {
@@ -69,7 +71,7 @@ test("F-06: sessions are re-checked against the users table and revocable", { sk
     await upsertUser(sql, { id, role: "staff" });
     const cookie = await cookieFor("staff", { id });
     assert.equal(await probe(cookie), "accepted", "precondition: session works before delete");
-    assert.equal((await call("DELETE", `/api/users/${id}`, owner)).status, 200, "owner deletes the user");
+    assert.equal((await call("DELETE", `/api/users/${id}`, owner, { currentPassword: ownerPassword })).status, 200, "owner deletes the user");
     assert.equal(await probe(cookie), "rejected", "a deleted user's session must be rejected");
   });
 
@@ -86,7 +88,7 @@ test("F-06: sessions are re-checked against the users table and revocable", { sk
     await upsertUser(sql, { id, role: "owner" });
     const cookie = await cookieFor("owner", { id });
     assert.equal(await probe(cookie), "accepted", "precondition");
-    assert.equal((await call("PATCH", `/api/users/${id}`, owner, { role: "staff" })).status, 200, "owner demotes");
+    assert.equal((await call("PATCH", `/api/users/${id}`, owner, { role: "staff", currentPassword: ownerPassword })).status, 200, "owner demotes");
     assert.equal(await probe(cookie), "rejected", "a demoted user's old session must be rejected");
   });
 
@@ -95,7 +97,7 @@ test("F-06: sessions are re-checked against the users table and revocable", { sk
     await upsertUser(sql, { id, role: "staff" });
     const cookie = await cookieFor("staff", { id });
     assert.equal(await probe(cookie), "accepted", "precondition");
-    const r = await call("PATCH", `/api/users/${id}`, owner, { password: "reset-password-123" });
+    const r = await call("PATCH", `/api/users/${id}`, owner, { password: "reset-password-123", currentPassword: ownerPassword });
     assert.equal(r.status, 200, `owner resets password (got ${r.status})`);
     assert.equal(await probe(cookie), "rejected", "sessions must end after a password reset");
   });

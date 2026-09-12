@@ -3,10 +3,10 @@ import { db } from "@/db";
 import { shopSettings, users, orders, expenses, cargoShipments, cargoPayments, cargoExpenses, cargoCategories } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { updateSettingsSchema, changePasswordSchema } from "@/validations/settings.schema";
-import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { auth, roleAtLeast, forbidden, verifyOwnPassword } from "@/lib/auth";
 import { CURRENCY_DEFAULTS, shopCurrency } from "@/lib/currency";
 import { withAudit, type Tx } from "@/lib/audit";
-import { compare, hash } from "bcryptjs";
+import { hash } from "bcryptjs";
 
 /** True once any record holding a base-currency amount exists. Soft-deleted rows count: they can be restored. */
 async function hasMoneyRecords(tx: Tx) {
@@ -67,11 +67,9 @@ export async function PATCH(req: NextRequest) {
       const userId = session.user?.id;
       if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-      const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-      if (!user) return NextResponse.json({ error: "User not found" }, { status: 404 });
-
-      const match = await compare(parsed.data.currentPassword, user.passwordHash);
-      if (!match) return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
+      // Wrong entries count toward the same per-account limit as confirmations on the Users page (AUDIT.md F-18).
+      const refused = await verifyOwnPassword(session, parsed.data.currentPassword);
+      if (refused) return refused;
 
       const passwordHash = await hash(parsed.data.newPassword, 12);
       // Ends every session this user has, including the current one (F-06).

@@ -25,6 +25,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import bcrypt from "bcryptjs";
 import { BASE, liveReady, skipReason, auditDb, alignSchemaWithApp, seedRoleUsers, upsertUser, cookieFor } from "./helpers/audit-session.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -182,7 +183,10 @@ test("F-14: every change is recorded, attributed and append-only", { skip: liveR
     });
 
     await t.test("password changes are recorded without any password hash", async () => {
-      const r = await call("PATCH", "/api/users/u_f14", cookie.owner, { password: "f14-new-password-1" });
+      // A reset needs the acting owner's own password (F-18).
+      const ownerPassword = "f14-owner-password-1";
+      await upsertUser(sql, { id: "u_owner", role: "owner", passwordHash: await bcrypt.hash(ownerPassword, 4) });
+      const r = await call("PATCH", "/api/users/u_f14", cookie.owner, { password: "f14-new-password-1", currentPassword: ownerPassword });
       assert.equal(r.status, 200, `reset password: ${r.status} ${r.text.slice(0, 200)}`);
       const row = (await logFor("users", "u_f14")).at(-1);
       assert.equal(row.user_id, "u_owner");

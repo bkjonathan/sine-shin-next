@@ -25,7 +25,8 @@ import {
   Trash2,
 } from "lucide-react";
 import type { CreateUserInput, UpdateUserInput } from "@/validations/user.schema";
-import { useUpdateUser, useDeleteUser } from "@/hooks/use-users";
+import { useUpdateUser } from "@/hooks/use-users";
+import { DeleteUserModal } from "@/components/users/delete-user-modal";
 import { GlassBadge } from "@/components/ui/glass-badge";
 import { cn } from "@/lib/utils";
 
@@ -302,8 +303,8 @@ function UserGrid({
   currentUserId?: string;
 }) {
   const [editing, setEditing] = useState<UserListItem | null>(null);
+  const [deleting, setDeleting] = useState<UserListItem | null>(null);
   const updateUser = useUpdateUser();
-  const deleteUser = useDeleteUser();
 
   if (isLoading) {
     return (
@@ -356,7 +357,7 @@ function UserGrid({
                     <GlassButton
                       variant="ghost"
                       size="sm"
-                      onClick={() => { if (confirm("Delete this user?")) deleteUser.mutate(u.id); }}
+                      onClick={() => setDeleting(u)}
                       className="hover:text-danger"
                       aria-label="Delete user"
                     >
@@ -384,6 +385,7 @@ function UserGrid({
           />
         </GlassModal>
       )}
+      <DeleteUserModal user={deleting} onClose={() => setDeleting(null)} />
     </>
   );
 }

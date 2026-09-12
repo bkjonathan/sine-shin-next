@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { useForm, type FieldErrors } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   createUserSchema,
@@ -42,6 +42,8 @@ const editUserSchema = z.object({
     .optional()
     .or(z.literal("")),
   role: z.enum(USER_ROLES),
+  // The signed-in owner's own password (AUDIT.md F-18).
+  currentPassword: z.string().max(128, "Password must be at most 128 characters").optional(),
 });
 
 type EditUserFormData = z.infer<typeof editUserSchema>;
@@ -55,6 +57,8 @@ export function UserForm({ defaultValues, onSubmit, isLoading, onCancel }: UserF
   const {
     register,
     handleSubmit,
+    watch,
+    setError,
     formState: { errors },
   } = useForm<CreateUserInput | EditUserFormData>({
     resolver: zodResolver(schema) as never,
@@ -62,8 +66,13 @@ export function UserForm({ defaultValues, onSubmit, isLoading, onCancel }: UserF
       username: defaultValues?.username ?? "",
       password: "",
       role: (defaultValues?.role as CreateUserInput["role"]) ?? "staff",
+      currentPassword: "",
     },
   });
+
+  // A password reset or role change asks for the owner's own password; a rename doesn't (AUDIT.md F-18).
+  const needsCurrentPassword = isEditing && (!!watch("password") || watch("role") !== defaultValues?.role);
+  const currentPasswordError = (errors as FieldErrors<EditUserFormData>).currentPassword?.message;
 
   const onFormSubmit = (data: CreateUserInput | EditUserFormData) => {
     if (isEditing) {
@@ -71,6 +80,14 @@ export function UserForm({ defaultValues, onSubmit, isLoading, onCancel }: UserF
       if (data.username && data.username !== defaultValues?.username) payload.username = data.username;
       if (data.password && data.password.length > 0) payload.password = data.password;
       if (data.role && data.role !== defaultValues?.role) payload.role = data.role;
+      if (payload.password || payload.role) {
+        const currentPassword = (data as EditUserFormData).currentPassword;
+        if (!currentPassword) {
+          setError("currentPassword", { message: "Enter your current password to confirm this change" });
+          return;
+        }
+        payload.currentPassword = currentPassword;
+      }
       onSubmit(payload);
     } else {
       onSubmit(data as CreateUserInput);
@@ -91,7 +108,7 @@ export function UserForm({ defaultValues, onSubmit, isLoading, onCancel }: UserF
         <GlassInput
           label={isEditing ? "New Password (leave blank to keep)" : "Password *"}
           type={showPassword ? "text" : "password"}
-          placeholder={isEditing ? "••••••••" : "Min 6 characters"}
+          placeholder={isEditing ? "••••••••" : `Min ${PASSWORD_MIN_LENGTH} characters`}
           autoComplete="new-password"
           error={errors.password?.message}
           {...register("password")}
@@ -120,6 +137,17 @@ export function UserForm({ defaultValues, onSubmit, isLoading, onCancel }: UserF
         </select>
         {errors.role && <p className="text-xs text-danger">{errors.role.message}</p>}
       </div>
+
+      {needsCurrentPassword && (
+        <GlassInput
+          label="Your current password *"
+          type="password"
+          autoComplete="current-password"
+          hint="Needed to reset a password or change a role"
+          error={currentPasswordError}
+          {...register("currentPassword")}
+        />
+      )}
 
       <div className="flex justify-end gap-3 pt-2">
         {onCancel && (

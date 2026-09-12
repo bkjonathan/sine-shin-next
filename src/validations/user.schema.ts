@@ -19,6 +19,10 @@ export const createUserSchema = z.object({
   role: z.enum(USER_ROLES),
 });
 
+// The acting owner's own password. The users route decides when it's required
+// (a password reset, role change or delete) and checks it (AUDIT.md F-18).
+const currentPassword = z.string().max(128, "Password must be at most 128 characters").optional();
+
 export const updateUserSchema = z.object({
   username: z
     .string()
@@ -33,7 +37,10 @@ export const updateUserSchema = z.object({
     .optional()
     .or(z.literal("")),
   role: z.enum(USER_ROLES).optional(),
+  currentPassword,
 });
+
+export const deleteUserSchema = z.object({ currentPassword });
 
 export type CreateUserInput = z.infer<typeof createUserSchema>;
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;

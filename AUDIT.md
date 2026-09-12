@@ -65,7 +65,7 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
   - **Username enumeration.** An unknown username is checked against a dummy cost-12 bcrypt hash. Measured on a local build, rejecting an existing vs an unknown username took 261 ms vs 4 ms before, and 264 ms vs 262 ms after.
   - **Password policy.** One `PASSWORD_MIN_LENGTH = 8` (src/validations/user.schema.ts) for create user, owner reset, self-service change and the Users edit form, which previously had no client-side minimum. Existing shorter passwords still sign in. Login input is capped at 100 (username) / 128 (password) characters.
   - **Verified** by `tests/f07-login-limits.test.mjs`: limiter unit tests with a fake clock, schema tests, and live sign-ins through Auth.js with faked client addresses. Before the fix, every check of the fix failed and only the three guard checks (normal sign-in, another address, reset on success) passed; after it, all pass. Full suite F-01–F-07: 83 tests pass.
-  - **Residual:** the counts live in process memory, so they reset on restart or redeploy and aren't shared if more than one replica ever runs. If port 3000 is reachable without Traefik (F-31), a client can forge `X-Forwarded-For` and dodge the limits — fix F-31. There is deliberately no per-username limit across addresses, because it would let anyone lock the owner out. F-18's one-password-policy part is done; its re-authentication part is not.
+  - **Residual:** the counts live in process memory, so they reset on restart or redeploy and aren't shared if more than one replica ever runs. If port 3000 is reachable without Traefik (F-31), a client can forge `X-Forwarded-For` and dodge the limits — fix F-31. There is deliberately no per-username limit across addresses, because it would let anyone lock the owner out. F-18's one-password-policy part is done here; its re-authentication part is done under F-18 below. (Found while doing F-18: sign-in records a failure only after the database lookup and bcrypt, so simultaneous wrong sign-ins for one key can all start before the limit is reached. Not changed; the F-18 password check counts each attempt before checking it.)
 - **F-08 — code fixed in working tree; production check still needed.**
   - **No default password.** src/db/seed.ts takes the owner password from `SEED_OWNER_PASSWORD` (refused under 8 characters) or generates a random 20-character one and prints it once. The credentials line in memory/project_shop_manager.md is replaced.
   - **The seed was also broken.** It imported `dotenv/config`, which isn't a dependency, so `npm run db:seed` failed with `Cannot find module`. The import is removed; pass `DATABASE_URL` in the environment, as the script's own usage line says. (Adding `dotenv` back would be a new dependency.)
@@ -301,6 +301,49 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
     - A value refused only by the server, such as an inline edit on the order or shipment page, shows "Validation failed" rather than the specific limit. The percentage rule is the exception.
     - IDs are capped at 36 characters, but `orders.customer_id`, `order_items.order_id` and `cargo_items.category_id` are `varchar(21)` in the database built from migrations. If production has 36-character customer IDs (src/db/schema/cargo-items.ts says `customers.id` mixes nanoids and legacy UUIDs), creating an order for such a customer fails with 500. Not certain: `customers.id` is `varchar(21)` in the throwaway database, so it needs a read-only check of production (F-33).
     - Query-string parsing (F-26) and the unvalidated DELETE bodies (F-24) are unchanged.
+- **F-18 — fixed in working tree; no migration; decisions agreed with the owner on 2026-09-12.** The password-minimum part was done under F-07; this closes the re-authentication part.
+  - **Decisions.**
+    - A password reset, a role change and deleting a user ask for the acting owner's own password, every time. Nothing is remembered between changes.
+    - Creating a user and renaming one don't ask (the audit's proposed scope).
+  - **Server.**
+    - `verifyOwnPassword(session, password)` in src/lib/auth.ts loads the signed-in user's hash and checks the password with bcrypt. It returns 400 when the password is missing or wrong. After 5 wrong entries for that account within 15 minutes it returns 429 ("Too many incorrect password attempts") for 15 minutes, even for the right password. A correct entry clears the count.
+    - Each attempt is counted before the bcrypt check, so simultaneous guesses can't all start before the limit is reached: 20 at once get five 400s and fifteen 429s.
+    - `PATCH /api/users/:id` calls it whenever the body sets a password or a role, before anything is saved. `DELETE /api/users/:id` now reads an optional JSON body (`deleteUserSchema`) and calls it before deleting. Both schemas accept `currentPassword` up to 128 characters.
+    - The check is always against the acting owner, never the account being changed, and it applies to the owner's own account too. **Correction to Appendix B §C:** before this fix an owner could set their own password through `PATCH /api/users/<own id>` without the current one, which skipped the check in Settings.
+    - `PATCH /api/settings` (changing your own password) uses the same helper, so its wrong entries count toward the same limit; otherwise either route could be used to guess the password behind a stolen session. Its messages are unchanged, except that a missing user row now gets 400 instead of 404.
+  - **UI.**
+    - Users → Edit shows "Your current password" only once the role or the new-password field changes, and won't send those changes without it. A rename alone saves as before.
+    - Delete, in the table and grid views, opens a small dialog asking for the owner's password instead of the browser's `confirm()`. A wrong password shows "Current password is incorrect" and keeps the dialog open.
+    - The create form's password placeholder said "Min 6 characters"; it now shows the real minimum (8).
+  - **Verified** by `tests/f18-reauth.test.mjs`:
+    - a schema test: `currentPassword` up to 128 characters on update and delete
+    - live checks on the throwaway database, each with its own owner account:
+      - a reset, a role change and a delete are refused without the owner's password or with a wrong one, and the reset also with the target's own password; nothing changes, and each succeeds with the right password
+      - an owner's own reset from Users is refused without the current password
+      - renaming and creating still don't ask
+      - four mistakes followed by the right password succeed, twice in a row
+      - three wrong entries through Users plus two through Settings block both routes with 429, even for the right password; another owner is unaffected
+      - 20 simultaneous wrong entries give exactly five 400s and fifteen 429s
+
+    Before the fix, on a build of the unfixed code, every check failed except the by-decision one. A reset, a role change, a delete and an owner's own reset each returned 200 with no password; the first wrong entry in the limit check was accepted; 20 simultaneous wrong entries all returned 200; and `deleteUserSchema` didn't exist. (The simultaneous-entries check was added after the first run and run against the same unfixed server.) The F-06, F-07 and F-14 tests now give their owner a known password and send it; F-07's 7-character reset sends it so its 400 can only come from the length rule. After the fix all pass. Full suite (`--test-concurrency=1`): 172 tests pass. `tsc --noEmit` is clean and `next build` passes.
+
+    Also checked in headless Chrome as an owner (17 checks):
+    - the edit form shows no password field until the role changes, and stops an empty password without sending anything
+    - a wrong password shows "Current password is incorrect", keeps the form open and leaves the role unchanged; the right one saves and closes
+    - a rename saves without asking
+    - the delete dialog names the user, stops an empty password without sending anything, keeps the user after a wrong password and deletes after the right one; the grid view opens the same dialog
+
+    The only console errors were the two expected 400s, and the only failed requests were Next.js link prefetches (`ERR_ABORTED`).
+  - **What the owner will see change:**
+    - Changing someone's role or password, or deleting a user, asks for your own password each time.
+    - Delete uses a dialog instead of the browser's confirm box.
+    - After 5 wrong passwords in 15 minutes, counting the Users page and the Settings password change together, both refuse for 15 minutes. Sign-in isn't affected.
+  - **Residual:**
+    - **By decision, creating a user doesn't ask.** A stolen owner session can still create a second owner account with a password of the attacker's choosing, sign in as it, and pass every check with that password. Asking for the password on create too would close this.
+    - Renaming doesn't ask either, so a stolen session can change another owner's sign-in name; that owner can't sign in until told the new one.
+    - The count is kept in process memory, like F-07's: a restart clears it and replicas wouldn't share it. It's per account, so anyone holding an owner's session can block that owner's Users-page changes and Settings password change for 15 minutes (not their sign-in).
+    - Refused attempts aren't in the audit log: F-14 records row changes, and a refused change writes none.
+    - A browser that has saved the owner's password can fill the field in, so an unattended signed-in browser is only partly covered; a copied session cookie is covered.
 - **New finding F-33 (found while verifying F-06).** A database built only from drizzle/0000–0009 lacks at least four columns the code uses: `expenses.expense_id`, `expenses.title`, `expenses.expense_date` and `cargo_items.note`. (Found later, while verifying F-10: migration 0000 creates the last two expense columns under their old names, `description` and `date`, both NOT NULL. So on such a database, creating an expense also fails.) On such a database the expenses API, the trash and the public `/t/[code]` page return 500 (`errorMissingColumn`). Existing databases presumably gained these columns through `db:push` — step 2 of the tracked setup doc (memory/project_shop_manager.md:33) is `npm run db:push`. Consequences: rebuilding from migrations (disaster recovery, a new environment) yields a broken app, and production's `drizzle.__drizzle_migrations` may not reflect its real schema — so check both before running `db:migrate` there (F-20). **Not fixed:** needs a read-only look at the production schema first.
 
 ---
@@ -326,7 +369,7 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
 | F-15 | MEDIUM | F Validation | src/validations/order.schema.ts:10-40 | ✓ fixed (WT; see §1a) — Amounts, rates, percentages and quantities have no upper bounds; dates unvalidated |
 | F-16 | MEDIUM | C Auth | src/app/(auth)/login/page.tsx:22,44 | ✓ fixed (WT; see §1a) — Open redirect after login via `callbackUrl` |
 | F-17 | MEDIUM | J Headers | next.config.ts:5-14 | ✓ fixed (WT; CSP still open — see §1a) — No CSP, HSTS, frame, nosniff or referrer headers; `X-Powered-By` enabled |
-| F-18 | MEDIUM | C Auth | src/app/api/users/[id]/route.ts:35-107 | ◐ password-minimum part done under F-07; re-authentication still open — Owner resets other users' passwords/roles with no re-authentication; 6-char passwords allowed |
+| F-18 | MEDIUM | C Auth | src/app/api/users/[id]/route.ts:35-107 | ✓ fixed (WT; resets, role changes and deletes ask for the owner's own password, agreed with owner; creating a user doesn't — see §1a) — Owner resets other users' passwords/roles with no re-authentication; 6-char passwords allowed |
 | F-19 | MEDIUM | F/G Correctness | src/validations/settings.schema.ts:8-10 | ✓ fixed (WT; numbering itself is F-13 — see §1a) — Any role can set an ID prefix that breaks order/customer/shipment creation |
 | F-20 | MEDIUM | N Migrations | drizzle/meta/_journal.json | Journal timestamps out of order; Drizzle silently skips older migrations |
 | F-21 | MEDIUM | I Secrets | Dockerfile:15,36 | ✓ fixed (WT; see §1a) — No `.dockerignore`; `.env` can be baked into the runtime image |
@@ -749,6 +792,8 @@ Set `poweredByHeader: false`. Add a CSP afterwards; the two inline scripts in sr
 **Effort:** Small
 
 #### F-18 — Password and role changes for other users need no re-authentication; weak password policy
+
+> **Status: fixed in working tree (not committed).** A password reset, role change or delete asks for the acting owner's own password, and wrong entries are limited per account; the single password minimum was done under F-07. Creating a user and renaming one don't ask, by decision. See §1a.
 
 **Area:** C Authentication
 **Where:** src/app/api/users/[id]/route.ts:35-107 (PATCH) and :114-135 (DELETE); src/validations/user.schema.ts:11-14, 25-30 (minimum 6); src/validations/settings.schema.ts:16 (minimum 8 for self-service).

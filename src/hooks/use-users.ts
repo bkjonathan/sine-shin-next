@@ -76,8 +76,9 @@ export function useUpdateUser() {
 export function useDeleteUser() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (id: string) => {
-      await api.delete(`/users/${id}`);
+    // Deleting a user needs the owner's own password (AUDIT.md F-18).
+    mutationFn: async ({ id, currentPassword }: { id: string; currentPassword: string }) => {
+      await api.delete(`/users/${id}`, { data: { currentPassword } });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
