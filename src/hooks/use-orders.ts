@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/axios";
+import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toast } from "sonner";
 import type { Order, OrderListItem, OrderWithItems, ListParams, ApiSuccess, PaginationMeta } from "@/types";
 import type { CreateOrderInput, UpdateOrderInput } from "@/validations/order.schema";
@@ -31,11 +32,13 @@ export function useOrder(id: string | undefined) {
 
 export function useCreateOrder() {
   const queryClient = useQueryClient();
+  const submission = useIdempotencyKey();
   return useMutation({
     mutationFn: async (input: CreateOrderInput) => {
-      const { data } = await api.post<ApiSuccess<Order>>("/orders", input);
+      const { data } = await api.post<ApiSuccess<Order>>("/orders", input, { headers: submission.headers() });
       return data.data;
     },
+    onSettled: (_data, error) => submission.settle(error),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
       toast.success("Order created successfully");
@@ -110,11 +113,13 @@ export function useOrderItems(orderId: string | undefined) {
 
 export function useAddOrderItem() {
   const queryClient = useQueryClient();
+  const submission = useIdempotencyKey();
   return useMutation({
     mutationFn: async ({ orderId, ...item }: import("@/validations/order.schema").OrderItemInput & { orderId: string }) => {
-      const { data } = await api.post<ApiSuccess<import("@/types").OrderItem>>(`/order-items/${orderId}`, item);
+      const { data } = await api.post<ApiSuccess<import("@/types").OrderItem>>(`/order-items/${orderId}`, item, { headers: submission.headers() });
       return data.data;
     },
+    onSettled: (_data, error) => submission.settle(error),
     onSuccess: (_, { orderId }) => {
       queryClient.invalidateQueries({ queryKey: ["order-items", orderId] });
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY, orderId] });

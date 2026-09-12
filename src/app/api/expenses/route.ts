@@ -6,7 +6,8 @@ import { nanoid } from "nanoid";
 import { createExpenseSchema } from "@/validations/expense.schema";
 import { auth, roleAtLeast } from "@/lib/auth";
 import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
-import { withAudit } from "@/lib/audit";
+import { createOnce } from "@/lib/idempotency";
+import { nextDisplayNumber } from "@/lib/display-number";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -100,17 +101,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [{ maxNum }] = await db.select({
-      maxNum: sql<number>`COALESCE(MAX(CAST(SPLIT_PART(expense_id, '-', 2) AS INTEGER)), 0)`,
-    }).from(expenses);
-    const expenseId = `EXP-${String(maxNum + 1).padStart(5, "0")}`;
-
-    const [expense] = await withAudit(req, session, (tx) => tx.insert(expenses).values({
-      id: nanoid(),
-      expenseId,
-      ...parsed.data,
-    }).returning());
-    return NextResponse.json({ data: expense }, { status: 201 });
+    // The number and the expense are saved together, once per submission (AUDIT.md F-13).
+    return await createOnce(req, session, parsed.data, async (tx) => {
+      const expenseId = await nextDisplayNumber(tx, expenses, expenses.expenseId, "EXP", "all");
+      const [expense] = await tx.insert(expenses).values({
+        id: nanoid(),
+        expenseId,
+        ...parsed.data,
+      }).returning();
+      return expense;
+    });
   } catch (err) {
     console.error("[POST /api/expenses]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

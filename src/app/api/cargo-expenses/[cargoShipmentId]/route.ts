@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { cargoExpenseSchema } from "@/validations/cargo.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 import { withAudit } from "@/lib/audit";
+import { createOnce } from "@/lib/idempotency";
 
 export async function GET(
   _req: NextRequest,
@@ -39,17 +40,19 @@ export async function POST(
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [expense] = await withAudit(req, session, (tx) => tx.insert(cargoExpenses).values({
-      id: nanoid(),
-      cargoShipmentId,
-      category: parsed.data.category,
-      description: parsed.data.description,
-      amount: parsed.data.amount,
-      incurredAt: parsed.data.incurredAt,
-      note: parsed.data.note,
-    }).returning());
-
-    return NextResponse.json({ data: expense }, { status: 201 });
+    // Saved once per submission (AUDIT.md F-13).
+    return await createOnce(req, session, parsed.data, async (tx) => {
+      const [expense] = await tx.insert(cargoExpenses).values({
+        id: nanoid(),
+        cargoShipmentId,
+        category: parsed.data.category,
+        description: parsed.data.description,
+        amount: parsed.data.amount,
+        incurredAt: parsed.data.incurredAt,
+        note: parsed.data.note,
+      }).returning();
+      return expense;
+    });
   } catch (err) {
     console.error("[POST /api/cargo-expenses/:cargoShipmentId]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

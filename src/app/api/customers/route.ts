@@ -5,7 +5,8 @@ import { isNull, ilike, desc, asc, sql, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createCustomerSchema } from "@/validations/customer.schema";
 import { auth } from "@/lib/auth";
-import { withAudit } from "@/lib/audit";
+import { createOnce } from "@/lib/idempotency";
+import { nextDisplayNumber } from "@/lib/display-number";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -69,28 +70,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get prefix from settings
     const { shopSettings } = await import("@/db/schema");
-    const [settings] = await db
-      .select({ customerIdPrefix: shopSettings.customerIdPrefix })
-      .from(shopSettings)
-      .where(eq(shopSettings.id, "singleton"))
-      .limit(1);
-    const prefix = (settings?.customerIdPrefix ?? "SSC").replace(/-+$/, "");
+    // The number and the customer are saved together, once per submission (AUDIT.md F-13).
+    return await createOnce(req, session, parsed.data, async (tx) => {
+      // Get prefix from settings
+      const [settings] = await tx
+        .select({ customerIdPrefix: shopSettings.customerIdPrefix })
+        .from(shopSettings)
+        .where(eq(shopSettings.id, "singleton"))
+        .limit(1);
+      const prefix = (settings?.customerIdPrefix ?? "SSC").replace(/-+$/, "");
 
-    // Derive next number from the max existing ID to avoid gaps from soft-deletes
-    const [{ maxNum }] = await db
-      .select({ maxNum: sql<number>`coalesce(max(cast(split_part(customer_id, '-', 2) as integer)), 0)` })
-      .from(customers);
-    const customerId = `${prefix}-${String(maxNum + 1).padStart(5, "0")}`;
+      // Derive next number from the max existing ID, whatever its prefix, to avoid gaps from soft-deletes
+      const customerId = await nextDisplayNumber(tx, customers, customers.customerId, prefix, "all");
 
-    const [customer] = await withAudit(req, session, (tx) => tx.insert(customers).values({
-      id: nanoid(),
-      customerId,
-      ...parsed.data,
-    }).returning());
-
-    return NextResponse.json({ data: customer }, { status: 201 });
+      const [customer] = await tx.insert(customers).values({
+        id: nanoid(),
+        customerId,
+        ...parsed.data,
+      }).returning();
+      return customer;
+    });
   } catch (err) {
     console.error("[POST /api/customers]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

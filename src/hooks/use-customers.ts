@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/axios";
+import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toast } from "sonner";
 import type { Customer, ListParams, ApiSuccess, PaginationMeta } from "@/types";
 import type { CreateCustomerInput, UpdateCustomerInput } from "@/validations/customer.schema";
@@ -33,11 +34,13 @@ export function useCustomer(id: string | undefined) {
 
 export function useCreateCustomer() {
   const queryClient = useQueryClient();
+  const submission = useIdempotencyKey();
   return useMutation({
     mutationFn: async (input: CreateCustomerInput) => {
-      const { data } = await api.post<ApiSuccess<Customer>>("/customers", input);
+      const { data } = await api.post<ApiSuccess<Customer>>("/customers", input, { headers: submission.headers() });
       return data.data;
     },
+    onSettled: (_data, error) => submission.settle(error),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
       toast.success("Customer created successfully");

@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/axios";
+import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toast } from "sonner";
 import type { Expense, ExpenseListParams, ApiSuccess, PaginationMeta } from "@/types";
 import type { CreateExpenseInput, UpdateExpenseInput } from "@/validations/expense.schema";
@@ -31,11 +32,13 @@ export function useExpense(id: string | undefined) {
 
 export function useCreateExpense() {
   const queryClient = useQueryClient();
+  const submission = useIdempotencyKey();
   return useMutation({
     mutationFn: async (input: CreateExpenseInput) => {
-      const { data } = await api.post<ApiSuccess<Expense>>("/expenses", input);
+      const { data } = await api.post<ApiSuccess<Expense>>("/expenses", input, { headers: submission.headers() });
       return data.data;
     },
+    onSettled: (_data, error) => submission.settle(error),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
       toast.success("Expense recorded");

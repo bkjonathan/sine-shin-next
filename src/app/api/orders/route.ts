@@ -5,7 +5,8 @@ import { isNull, desc, asc, sql, eq, and, ilike } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createOrderSchema } from "@/validations/order.schema";
 import { auth } from "@/lib/auth";
-import { withAudit } from "@/lib/audit";
+import { createOnce } from "@/lib/idempotency";
+import { nextDisplayNumber } from "@/lib/display-number";
 import { orderTotalSql } from "@/lib/order-money-sql";
 
 export async function GET(req: NextRequest) {
@@ -97,20 +98,17 @@ export async function POST(req: NextRequest) {
     const { items, ...orderData } = parsed.data;
 
     const { shopSettings } = await import("@/db/schema");
-    const [settings] = await db
-      .select({ orderIdPrefix: shopSettings.orderIdPrefix })
-      .from(shopSettings)
-      .limit(1);
-    const prefix = (settings?.orderIdPrefix ?? "ORD").replace(/-+$/, "");
-    const [{ maxNum }] = await db
-      .select({ maxNum: sql<number>`coalesce(max(cast(split_part(order_id, '-', 2) as integer)), 0)` })
-      .from(orders)
-      .where(ilike(orders.orderId, `${prefix}-%`));
-    const orderId = `${prefix}-${String(maxNum + 1).padStart(5, "0")}`;
-
     const orderId_ = nanoid();
-    // The order and its items are saved, and recorded, together (AUDIT.md F-14).
-    const createdOrder = await withAudit(req, session, async (tx) => {
+    // The number, the order and its items are saved, and recorded, together,
+    // once per submission (AUDIT.md F-13, F-14).
+    return await createOnce(req, session, parsed.data, async (tx) => {
+      const [settings] = await tx
+        .select({ orderIdPrefix: shopSettings.orderIdPrefix })
+        .from(shopSettings)
+        .limit(1);
+      const prefix = (settings?.orderIdPrefix ?? "ORD").replace(/-+$/, "");
+      const orderId = await nextDisplayNumber(tx, orders, orders.orderId, prefix, "prefix");
+
       const [created] = await tx.insert(orders).values({
         id: orderId_,
         orderId,
@@ -131,8 +129,6 @@ export async function POST(req: NextRequest) {
       }
       return created;
     });
-
-    return NextResponse.json({ data: createdOrder }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/orders]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

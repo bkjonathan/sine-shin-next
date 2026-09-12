@@ -5,7 +5,8 @@ import { isNull, desc, asc, sql, eq, and, or, ilike } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createCargoShipmentSchema } from "@/validations/cargo.schema";
 import { auth } from "@/lib/auth";
-import { withAudit } from "@/lib/audit";
+import { createOnce } from "@/lib/idempotency";
+import { nextDisplayNumber } from "@/lib/display-number";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -88,20 +89,17 @@ export async function POST(req: NextRequest) {
 
     const { items, ...shipmentData } = parsed.data;
 
-    const [settings] = await db
-      .select({ cargoIdPrefix: shopSettings.cargoIdPrefix })
-      .from(shopSettings)
-      .limit(1);
-    const prefix = (settings?.cargoIdPrefix ?? "CG").replace(/-+$/, "");
-    const [{ maxNum }] = await db
-      .select({ maxNum: sql<number>`coalesce(max(cast(split_part(cargo_no, '-', 2) as integer)), 0)` })
-      .from(cargoShipments)
-      .where(ilike(cargoShipments.cargoNo, `${prefix}-%`));
-    const cargoNo = `${prefix}-${String(maxNum + 1).padStart(5, "0")}`;
-
     const shipmentId = nanoid();
-    // The shipment and its items are saved, and recorded, together (AUDIT.md F-14).
-    const createdShipment = await withAudit(req, session, async (tx) => {
+    // The number, the shipment and its items are saved, and recorded, together,
+    // once per submission (AUDIT.md F-13, F-14).
+    return await createOnce(req, session, parsed.data, async (tx) => {
+      const [settings] = await tx
+        .select({ cargoIdPrefix: shopSettings.cargoIdPrefix })
+        .from(shopSettings)
+        .limit(1);
+      const prefix = (settings?.cargoIdPrefix ?? "CG").replace(/-+$/, "");
+      const cargoNo = await nextDisplayNumber(tx, cargoShipments, cargoShipments.cargoNo, prefix, "prefix");
+
       const [created] = await tx.insert(cargoShipments).values({
         id: shipmentId,
         cargoNo,
@@ -125,8 +123,6 @@ export async function POST(req: NextRequest) {
       }
       return created;
     });
-
-    return NextResponse.json({ data: createdShipment }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/cargo-shipments]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

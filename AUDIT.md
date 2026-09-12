@@ -34,7 +34,7 @@ There is also no rate limiting, no transactions, no idempotency, no security hea
 
 ## 1a. Post-audit status (working-tree fixes)
 
-_Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the owner in `6fcf5c8`. Everything after that — the quick hardening batch, the F-09 report, F-10, F-11, F-12 and F-14 — is in the working tree and **not committed**. The per-finding "(WT)" / "not committed" labels were written before that commit._
+_Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the owner in `6fcf5c8`, and the quick hardening batch, the F-09 report, F-10, F-11, F-12 and F-14 in `a201508`. F-13 is in the working tree and **not committed**. The per-finding "(WT)" / "not committed" labels were written before those commits._
 
 - **F-01 — fixed in working tree.** Upgraded `next` and `eslint-config-next` 16.2.1 → **16.2.12**, which clears all four middleware/proxy-bypass advisories. Verified by `next build`, `tsc --noEmit`, and a version + runtime guard (`tests/f01-next-version.test.mjs`). Caveat: a live bypass could **not** be reproduced on this app at 16.2.1 — middleware redirected every `.rsc`/segment variant tried. **Residual:** `next` still wants **16.3.3+** for the AVIF image-optimiser and Windows-host RCE advisories (both believed unreachable here — no `next/image`, Linux host); tracked as a separate follow-up.
 - **F-02 — fixed in working tree; severity corrected.** Added a `requireSession()` gate to the three detail pages (`tests/f02-page-auth.test.mjs`). **Corrected severity: HIGH → LOW–MEDIUM (defense-in-depth).** The original HIGH over-stated it: alongside middleware, the `(dashboard)` layout's own `auth()` already redirects direct/anonymous requests (verified), so this was never a live anonymous-read hole — the real residual was only the partial-rendering / lost-coverage case. The section-1 summary and the section-2 counts still reflect the **original** assessment; this note supersedes the F-02 severity.
@@ -180,6 +180,46 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
     - only the owner saw the Users link
 
     This check also found the hard-coded "$" displays recorded under F-11's follow-up.
+- **F-13 — fixed in working tree; migration 0012 must run first; decisions agreed with the owner on 2026-09-12.**
+  - **Decisions.**
+    - Display numbers stay "highest existing + 1": if the top-numbered record is permanently deleted, its number is given out again, as before.
+    - Retry protection covers every create that records money or a numbered record: orders, order items, cargo shipments, cargo items, cargo payments, cargo expenses, expenses and customers. Cargo categories (owner setup) and users (usernames are unique) are left out.
+  - **Numbers.** `nextDisplayNumber()` (src/lib/display-number.ts) runs inside the create's transaction, after taking a transaction-level advisory lock for that table. A second create of the same kind waits there until the first commits, then sees its number. Only `PREFIX-digits` IDs count, so one malformed stored ID no longer makes every later create fail. As before, orders and shipments count per prefix, and customers and expenses count every ID.
+  - **Retries.**
+    - `createOnce()` (src/lib/idempotency.ts) runs all eight creates. When the request has an `Idempotency-Key` header, it claims the key in the same transaction as the create and stores the reply with it (drizzle/0012_idempotency_keys.sql).
+    - A retry with the same key waits for the first attempt to finish, then gets the stored reply (201, `Idempotent-Replayed: true`) and nothing new is saved. If the first attempt rolled back, its key went with it and the retry creates the record.
+    - The same key with different values, or on another endpoint, gets 422. Keys are per user, 16–100 characters, and deleted after 24 hours.
+    - A create refused inside the transaction, such as a payment in a disallowed currency, rolls its key back too, so the corrected form can be saved.
+    - In the browser, the eight create hooks send one key per submission (src/hooks/use-idempotency-key.ts). A hook keeps its key only while the outcome is unknown (no reply, or 502/503/504 from the proxy) and takes a new one once the app has answered. Requests without a key still work as before.
+  - **Settings and the currency lock.** `PATCH /api/settings` locks the settings row (`FOR UPDATE`) and checks and saves in one transaction; a first save uses `ON CONFLICT`, so two first saves no longer collide. When the base currency changes, it locks the six money tables in SHARE mode before looking for money records: a record still being saved is waited for and counted, and none can be added until the change commits. Cargo payments read the settings row `FOR SHARE` inside their transaction, so their currency check can't pass against a currency that is being changed. This closes F-11's "lock check and update are not one transaction" residual, F-14's "display-number races and idempotency are unchanged", and the numbering part of F-19's residual.
+  - **Verified** by `tests/f13-transactions-idempotency.test.mjs`:
+    - a unit test of when the browser keeps a key, and a guard that the eight routes use `createOnce`, the eight hooks send a key, and no route computes numbers itself
+    - live checks on the throwaway database:
+      - 8 simultaneous creates each of orders, customers, expenses and shipments get distinct numbers
+      - a malformed stored order or customer ID doesn't block the next create
+      - a retried order returns the saved order and its one item; a changed retry gets 422; three simultaneous retries save one order
+      - another user's identical key creates their own order; malformed keys get 400
+      - each of the other seven creates returns the saved record on retry
+      - a refused payment and a failed cargo item don't use up their keys
+      - five simultaneous first-time settings saves all succeed and leave one row
+      - a base-currency change waits for an order still being saved, then returns 409
+
+    Before the fix all 12 checks failed. 8 simultaneous orders gave two 201s and six 500s (`orders_order_id_unique`); the malformed order ID gave a 500 (`invalid input syntax for type integer`); a retried order and a retried order item each saved a second record, and so did a changed retry; malformed keys were accepted; 4 of 5 first-time settings saves failed on `shop_settings_pkey`; and the currency change returned 200 while the order was still uncommitted. (The refused-key check failed only because that change had gone through; it guards the rollback. The lock step now puts the currency back at once if a build accepts the change.) After the fix all 12 pass. The F-14 guard also accepts `createOnce` as an audited write. Full suite (`--test-concurrency=1`): 155 tests pass. `tsc --noEmit` is clean and `next build` passes.
+
+    Also checked in headless Chrome, as staff on the Expenses page. The first Record Expense reached the server and its reply was dropped, and the form stayed open. The second click sent the same key, got the saved EXP-00001 back and closed the form. The next expense used a new key (EXP-00002), and the database held exactly those two. The only other failed requests were six Next.js link prefetches (`ERR_ABORTED`), and the only console error was the dropped request.
+  - **Deploy order.** Apply 0012 before or together with the new image. The new browser code sends a key with every create, and until the table exists each of those creates returns 500. Old code doesn't use the table, so running 0012 early is safe; run its statements by hand (F-06 note, F-33).
+  - **What the owner will see change:**
+    - Nothing in normal use.
+    - Saving again after a timeout no longer creates a second order, payment, expense or item; the form closes as if the first save had worked.
+    - A form changed and saved again after a timeout shows "This form was already saved with different values…" once.
+  - **Residual:**
+    - After that 422, saving again creates the changed values as a new record, so the first one may need deleting. Keeping the key instead would block a deliberate new record from the same form until a reload.
+    - `expenses.expense_id` still has no unique constraint. The app can no longer create duplicates, but production may already hold some. Check read-only before adding one: `select expense_id, count(*) from expenses where expense_id is not null group by 1 having count(*) > 1`.
+    - A retry more than 24 hours after the first attempt isn't recognised. Stored replies (the created record) are kept outside the audit log for up to 24 hours.
+    - Creates of one numbered kind now run one at a time from the lock until commit, so a slow order create delays the next one. Not measured; at shop scale it shouldn't be noticeable.
+    - Customers still count across every prefix (F-19 residual, unchanged).
+    - F-25 (parent checks) is still open. `createOnce` lets a create return a 404 from inside its transaction, which F-25 needs.
+    - Only the expense form was checked in a browser; the other seven forms use the same hook helper.
 - **F-14 — fixed in working tree; migration 0011 must run first; decisions agreed with the owner on 2026-09-12.**
   - **Decisions.** Record every change to shop data, permanently, and never store password hashes. An owner-only Settings → Activity page shows the log.
   - **How changes are recorded.** drizzle/0011_audit_log.sql adds an `audit_log` table and a trigger on all 11 business tables.
@@ -236,7 +276,7 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
 | F-10 | HIGH | G Money | src/app/api/dashboard/route.ts:73-74 | ✓ fixed (WT; definitions agreed with owner — see §1a) — Revenue and profit have conflicting definitions; percentage service fee summed as money |
 | F-11 | HIGH | G Money | src/components/cargo/cargo-detail-client.tsx:188-192 | ✓ fixed (WT; migration 0010 must run first; decisions agreed with owner — see §1a) — Cargo payment balances depend on a per-browser localStorage currency |
 | F-12 | MEDIUM | A/E Access control | src/app/api/dashboard/route.ts:28-30 | ✓ fixed (WT; summaries manager+, agreed with owner; records still visible to staff — see §1a) — Financial data blocked in `/api/reports` is served to every role by other endpoints |
-| F-13 | MEDIUM | G Correctness | src/app/api/orders/route.ts:96-126 | No transactions, racy display-number generation, no idempotency |
+| F-13 | MEDIUM | G Correctness | src/app/api/orders/route.ts:96-126 | ✓ fixed (WT; migration 0012 must run first — see §1a) — No transactions, racy display-number generation, no idempotency |
 | F-14 | MEDIUM | K Audit | src/db/schema/index.ts:1-11 | ✓ fixed (WT; migration 0011 must run first; owner-only Activity page — see §1a) — No audit trail for any money, status, delete or user change |
 | F-15 | MEDIUM | F Validation | src/validations/order.schema.ts:10-40 | Amounts, rates, percentages and quantities have no upper bounds; dates unvalidated |
 | F-16 | MEDIUM | C Auth | src/app/(auth)/login/page.tsx:22,44 | ✓ fixed (WT; see §1a) — Open redirect after login via `callbackUrl` |
@@ -562,6 +602,8 @@ Read `numeric` values as strings in Drizzle, and do arithmetic in integer minor 
 **Effort:** Small
 
 #### F-13 — No transactions, racy display-number generation, no idempotency
+
+> **Status: fixed in working tree (not committed); migration 0012 must run first.** Each create that records money or a numbered record now runs in one transaction and is saved at most once per Idempotency-Key. Display numbers are computed inside that transaction under a lock, and the settings save checks and writes in one transaction. By the owner's decision, numbers are still "highest existing + 1". See §1a.
 
 **Area:** G Money and data correctness
 **Where:**

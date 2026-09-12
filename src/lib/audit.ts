@@ -3,7 +3,7 @@ import type { Session } from "next-auth";
 import { db } from "@/db";
 import { clientIp } from "@/lib/auth";
 
-type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+export type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 /**
  * Runs a route handler's writes in one transaction and tells the audit_log

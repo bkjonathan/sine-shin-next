@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import api from "@/lib/axios";
+import { useIdempotencyKey } from "@/hooks/use-idempotency-key";
 import { toast } from "sonner";
 import type {
   CargoShipment,
@@ -47,11 +48,13 @@ export function useCargoShipment(id: string | undefined) {
 
 export function useCreateCargoShipment() {
   const queryClient = useQueryClient();
+  const submission = useIdempotencyKey();
   return useMutation({
     mutationFn: async (input: CreateCargoShipmentInput) => {
-      const { data } = await api.post<ApiSuccess<CargoShipment>>("/cargo-shipments", input);
+      const { data } = await api.post<ApiSuccess<CargoShipment>>("/cargo-shipments", input, { headers: submission.headers() });
       return data.data;
     },
+    onSettled: (_data, error) => submission.settle(error),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
       toast.success("Cargo shipment created");
@@ -98,11 +101,13 @@ export function useDeleteCargoShipment() {
 
 export function useAddCargoItem() {
   const queryClient = useQueryClient();
+  const submission = useIdempotencyKey();
   return useMutation({
     mutationFn: async ({ cargoShipmentId, ...item }: CargoItemInput & { cargoShipmentId: string }) => {
-      const { data } = await api.post(`/cargo-items/${cargoShipmentId}`, item);
+      const { data } = await api.post(`/cargo-items/${cargoShipmentId}`, item, { headers: submission.headers() });
       return data.data;
     },
+    onSettled: (_data, error) => submission.settle(error),
     onSuccess: (_, { cargoShipmentId }) => {
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY, cargoShipmentId] });
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY] });
@@ -184,11 +189,13 @@ export function useCargoPayments(cargoShipmentId: string | undefined) {
 
 export function useAddCargoPayment() {
   const queryClient = useQueryClient();
+  const submission = useIdempotencyKey();
   return useMutation({
     mutationFn: async ({ cargoShipmentId, ...payment }: CargoPaymentInput & { cargoShipmentId: string }) => {
-      const { data } = await api.post(`/cargo-payments/${cargoShipmentId}`, payment);
+      const { data } = await api.post(`/cargo-payments/${cargoShipmentId}`, payment, { headers: submission.headers() });
       return data.data;
     },
+    onSettled: (_data, error) => submission.settle(error),
     onSuccess: (_, { cargoShipmentId }) => {
       queryClient.invalidateQueries({ queryKey: ["cargo-payments", cargoShipmentId] });
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY, cargoShipmentId] });
@@ -232,11 +239,13 @@ export function useCargoExpenses(cargoShipmentId: string | undefined) {
 
 export function useAddCargoExpense() {
   const queryClient = useQueryClient();
+  const submission = useIdempotencyKey();
   return useMutation({
     mutationFn: async ({ cargoShipmentId, ...expense }: CargoExpenseInput & { cargoShipmentId: string }) => {
-      const { data } = await api.post(`/cargo-expenses/${cargoShipmentId}`, expense);
+      const { data } = await api.post(`/cargo-expenses/${cargoShipmentId}`, expense, { headers: submission.headers() });
       return data.data;
     },
+    onSettled: (_data, error) => submission.settle(error),
     onSuccess: (_, { cargoShipmentId }) => {
       queryClient.invalidateQueries({ queryKey: ["cargo-expenses", cargoShipmentId] });
       queryClient.invalidateQueries({ queryKey: [QUERY_KEY, cargoShipmentId] });

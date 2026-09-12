@@ -85,6 +85,13 @@
       "when": 1789165000000,
       "tag": "0011_audit_log",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1789180200674,
+      "tag": "0012_idempotency_keys",
+      "breakpoints": true
     }
   ]
 }

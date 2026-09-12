@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { orderItemSchema } from "@/validations/order.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 import { withAudit } from "@/lib/audit";
+import { createOnce } from "@/lib/idempotency";
 
 export async function GET(
   _req: NextRequest,
@@ -38,16 +39,18 @@ export async function POST(
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [item] = await withAudit(req, session, (tx) => tx.insert(orderItems).values({
-      id: nanoid(),
-      orderId,
-      productUrl: parsed.data.productUrl,
-      productQty: parsed.data.productQty,
-      price: parsed.data.price,
-      productWeight: parsed.data.productWeight,
-    }).returning());
-
-    return NextResponse.json({ data: item }, { status: 201 });
+    // Saved once per submission (AUDIT.md F-13).
+    return await createOnce(req, session, parsed.data, async (tx) => {
+      const [item] = await tx.insert(orderItems).values({
+        id: nanoid(),
+        orderId,
+        productUrl: parsed.data.productUrl,
+        productQty: parsed.data.productQty,
+        price: parsed.data.price,
+        productWeight: parsed.data.productWeight,
+      }).returning();
+      return item;
+    });
   } catch (err) {
     console.error("[POST /api/order-items/:orderId]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

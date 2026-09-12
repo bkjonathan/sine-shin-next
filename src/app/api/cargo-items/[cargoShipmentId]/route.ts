@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import { cargoItemSchema, updateCargoItemSchema } from "@/validations/cargo.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 import { withAudit } from "@/lib/audit";
+import { createOnce } from "@/lib/idempotency";
 
 export async function POST(
   req: NextRequest,
@@ -21,21 +22,23 @@ export async function POST(
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [item] = await withAudit(req, session, (tx) => tx.insert(cargoItems).values({
-      id: nanoid(),
-      cargoShipmentId,
-      orderId: parsed.data.orderId ?? null,
-      customerId: parsed.data.customerId ?? null,
-      orderItemId: parsed.data.orderItemId ?? null,
-      categoryId: parsed.data.categoryId,
-      bagLabel: parsed.data.bagLabel?.trim() || null,
-      weightKg: parsed.data.weightKg,
-      carrierRatePerKg: parsed.data.carrierRatePerKg,
-      receiverRatePerKg: parsed.data.receiverRatePerKg,
-      note: parsed.data.note ?? null,
-    }).returning());
-
-    return NextResponse.json({ data: item }, { status: 201 });
+    // Saved once per submission (AUDIT.md F-13).
+    return await createOnce(req, session, parsed.data, async (tx) => {
+      const [item] = await tx.insert(cargoItems).values({
+        id: nanoid(),
+        cargoShipmentId,
+        orderId: parsed.data.orderId ?? null,
+        customerId: parsed.data.customerId ?? null,
+        orderItemId: parsed.data.orderItemId ?? null,
+        categoryId: parsed.data.categoryId,
+        bagLabel: parsed.data.bagLabel?.trim() || null,
+        weightKg: parsed.data.weightKg,
+        carrierRatePerKg: parsed.data.carrierRatePerKg,
+        receiverRatePerKg: parsed.data.receiverRatePerKg,
+        note: parsed.data.note ?? null,
+      }).returning();
+      return item;
+    });
   } catch (err) {
     console.error("[POST /api/cargo-items/:cargoShipmentId]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

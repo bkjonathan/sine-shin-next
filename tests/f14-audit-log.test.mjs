@@ -68,7 +68,8 @@ test("F-14: every route handler write goes through withAudit", () => {
     if (/\bdb\s*\.\s*(insert|update|delete)\s*\(/.test(text)) offenders.push(`${file}: writes with db instead of withAudit's tx`);
     if (/\btx\s*\.\s*(insert|update|delete)\s*\(/.test(text)) {
       writers += 1;
-      if (!text.includes("withAudit(")) offenders.push(`${file}: tx without withAudit`);
+      // createOnce (F-13) runs its work inside withAudit.
+      if (!/\b(withAudit|createOnce)\(/.test(text)) offenders.push(`${file}: tx without withAudit`);
     }
   }
   assert.deepEqual(offenders, [], "writes that audit_log can't attribute to a user");
