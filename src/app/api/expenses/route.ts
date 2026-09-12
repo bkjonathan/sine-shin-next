@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { expenses } from "@/db/schema";
 import { isNull, desc, asc, sql, ilike, eq, and, gte, lte } from "drizzle-orm";
+import { containsPattern, intParam } from "@/lib/query";
 import { nanoid } from "nanoid";
 import { createExpenseSchema } from "@/validations/expense.schema";
 import { auth, roleAtLeast } from "@/lib/auth";
@@ -15,8 +16,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const { searchParams } = req.nextUrl;
-    const page = Math.max(1, Number(searchParams.get("page") ?? 1));
-    const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
+    const page = intParam(searchParams.get("page"), 1, 1, 1_000_000);
+    const limit = intParam(searchParams.get("limit"), 20, 1, 100);
     const search = searchParams.get("search") ?? "";
     const searchField = searchParams.get("searchField") ?? "title";
     const category = searchParams.get("category") ?? "";
@@ -28,8 +29,8 @@ export async function GET(req: NextRequest) {
 
     const searchWhere = search
       ? searchField === "expenseId"
-        ? ilike(expenses.expenseId, `%${search}%`)
-        : ilike(expenses.description, `%${search}%`)
+        ? ilike(expenses.expenseId, containsPattern(search))
+        : ilike(expenses.description, containsPattern(search))
       : undefined;
 
     const whereClause = and(

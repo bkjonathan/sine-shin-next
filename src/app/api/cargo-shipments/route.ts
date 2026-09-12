@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { cargoShipments, cargoItems, shopSettings } from "@/db/schema";
 import { isNull, desc, asc, sql, eq, and, or, ilike } from "drizzle-orm";
+import { containsPattern, intParam } from "@/lib/query";
+import { missingRecord } from "@/lib/parents";
 import { nanoid } from "nanoid";
 import { createCargoShipmentSchema } from "@/validations/cargo.schema";
 import { auth } from "@/lib/auth";
@@ -14,8 +16,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const { searchParams } = req.nextUrl;
-    const page = Math.max(1, Number(searchParams.get("page") ?? 1));
-    const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
+    const page = intParam(searchParams.get("page"), 1, 1, 1_000_000);
+    const limit = intParam(searchParams.get("limit"), 20, 1, 100);
     const search = searchParams.get("search") ?? "";
     const status = searchParams.get("status") ?? "";
     const sort = searchParams.get("sort") ?? "createdAt";
@@ -27,8 +29,8 @@ export async function GET(req: NextRequest) {
     if (search) {
       baseConditions.push(
         or(
-          ilike(cargoShipments.cargoNo, `%${search}%`),
-          ilike(cargoShipments.carrierName, `%${search}%`)
+          ilike(cargoShipments.cargoNo, containsPattern(search)),
+          ilike(cargoShipments.carrierName, containsPattern(search))
         )!
       );
     }
@@ -99,6 +101,15 @@ export async function POST(req: NextRequest) {
         .limit(1);
       const prefix = (settings?.cargoIdPrefix ?? "CG").replace(/-+$/, "");
       const cargoNo = await nextDisplayNumber(tx, cargoShipments, cargoShipments.cargoNo, prefix, "prefix");
+
+      // Everything the items point at must exist and not be in the trash (AUDIT.md F-25).
+      const missing = await missingRecord(tx, (items ?? []).flatMap((item) => [
+        ["order", item.orderId],
+        ["orderItem", item.orderItemId],
+        ["customer", item.customerId],
+        ["category", item.categoryId],
+      ] as const));
+      if (missing) return missing;
 
       const [created] = await tx.insert(cargoShipments).values({
         id: shipmentId,

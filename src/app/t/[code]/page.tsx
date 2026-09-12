@@ -68,10 +68,15 @@ export default async function PublicTrackingPage({ params }: Props) {
 
   if (!row) notFound();
 
-  const [shop] = await db.select().from(shopSettings).limit(1);
+  // Only what the public components show. The rest of the settings row (ID
+  // prefixes, currencies, rates) isn't for anonymous visitors (AUDIT.md F-23).
+  const [shop] = await db
+    .select({ shopName: shopSettings.shopName, logoUrl: shopSettings.logoUrl })
+    .from(shopSettings)
+    .limit(1);
   const status = row.status as CargoStatus;
 
-  // Once delivered the page closes. The gate is here rather than in the view so
+  // Once delivered or cancelled the page closes. The gate is here rather than in the view so
   // the consignee and carrier fields are never serialised into the RSC payload
   // — hiding them in the markup would still ship them to the browser.
   if (isTrackingClosed(status)) {

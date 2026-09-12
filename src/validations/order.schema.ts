@@ -5,6 +5,9 @@ import {
   QUANTITY_LIMIT, RATE_LIMIT, WEIGHT_LIMIT, optionalIsoDate,
 } from "./limits";
 
+// A DELETE body names the order item to move to the trash (AUDIT.md F-24).
+export const deleteOrderItemSchema = z.object({ itemId: z.string().min(1).max(MAX_ID) });
+
 export const ORDER_STATUSES = ["pending", "ordered", "arrived", "shipping", "completed", "cancelled"] as const;
 export type OrderStatus = (typeof ORDER_STATUSES)[number];
 

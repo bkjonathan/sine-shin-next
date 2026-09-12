@@ -1,14 +1,14 @@
 import { Truck } from "lucide-react";
 import { STATUS_META } from "@/components/cargo/public-tracking-status";
 import { cn } from "@/lib/utils";
-import type { CargoStatus, ShopSettings } from "@/types";
+import type { CargoStatus, PublicShop } from "@/types";
 
 /** Shop identity + status chip, shared by the open and closed tracking pages. */
 export function PublicTrackingHeader({
   shop,
   status,
 }: {
-  shop: ShopSettings | null;
+  shop: PublicShop | null;
   status: CargoStatus;
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.pending;

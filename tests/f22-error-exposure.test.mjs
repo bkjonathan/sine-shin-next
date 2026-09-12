@@ -200,22 +200,30 @@ test("F-22: failed queries answer with a generic error, and the logs keep no val
   });
 
   await t.test("logs keep the SQL and error codes but no values, for caught and uncaught errors", { skip: logFile ? false : "set AUDIT_SERVER_LOG to the server's log file" }, async () => {
-    // Caught by the handler: a write that fails its foreign key, with the marker in its values.
-    const write = await call("POST", `/api/order-items/${marker}-order`, cookie.staff, { productUrl: `${marker}-url`, productQty: 1, price: 1 });
-    assert.equal(write.status, 500, `order item write: ${write.status} ${write.text.slice(0, 200)}`);
+    // Caught by the handler: a second category with the same name fails its unique
+    // constraint. The name (the marker) is in the query's values and in Postgres's detail.
+    const category = { name: `${marker}-category`, carrierRatePerKg: 1, receiverRatePerKg: 1 };
+    assert.equal((await call("POST", "/api/cargo-categories", cookie.owner, category)).status, 201, "first category");
+    const duplicate = await call("POST", "/api/cargo-categories", cookie.owner, category);
+    // F-13 skips one of its checks while any category exists.
+    const cleanup = auditDb();
+    await cleanup`delete from cargo_categories where name = ${category.name}`;
+    await cleanup.end();
+    assert.equal(duplicate.status, 500, `duplicate category: ${duplicate.status} ${duplicate.text.slice(0, 200)}`);
     // Not caught: this handler has no try/catch, so Next.js logs the error. Postgres rejects the NUL character.
-    const uncaught = await call("DELETE", "/api/cargo-items/f22-shipment", cookie.manager, { itemId: `${marker}-nul${String.fromCharCode(0)}` });
-    assert.equal(uncaught.status, 500, `cargo item delete: ${uncaught.status} ${uncaught.text.slice(0, 200)}`);
+    const uncaught = await call("GET", `/api/orders/${marker}-nul%00`, cookie.owner);
+    assert.equal(uncaught.status, 500, `order lookup: ${uncaught.status} ${uncaught.text.slice(0, 200)}`);
     assert.ok(!uncaught.text.includes(marker));
 
     const log = readFileSync(logFile).subarray(logStart).toString("utf8");
     const at = log.indexOf(marker);
     assert.equal(at, -1, `a request value reached the log:\n${log.slice(Math.max(0, at - 400), at + 200)}`);
     assert.match(log, /\[GET \/api\/dashboard\]/, "the failed summaries were logged");
-    assert.match(log, /\[POST \/api\/order-items\/:orderId\]/, "the failed write was logged");
-    assert.match(log, /23503/, "with its error code");
-    assert.match(log, /order_items_order_id_orders_id_fk/, "and constraint");
-    assert.match(log, /22021/, "the uncaught error was logged with its code");
+    assert.match(log, /\[POST \/api\/cargo-categories\]/, "the failed write was logged");
+    assert.match(log, /23505/, "with its error code");
+    assert.match(log, /cargo_categories_name_unique/, "and constraint");
+    assert.match(log, /⨯/, "Next.js logged the uncaught error itself");
+    assert.match(log, /22021/, "with its code");
     assert.match(log, /values withheld/);
   });
 });

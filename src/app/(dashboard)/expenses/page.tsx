@@ -14,7 +14,7 @@ import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { useHasRole } from "@/hooks/use-role";
 import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
 import { Plus, Download, Upload, ArrowUp, ArrowDown, LayoutGrid, List } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, toCsv } from "@/lib/utils";
 import type { CreateExpenseInput } from "@/validations/expense.schema";
 import { EXPENSE_CATEGORIES } from "@/validations/expense.schema";
 import type { Expense } from "@/types";
@@ -89,7 +89,7 @@ export default function ExpensesPage() {
       e.category,
       String(e.amount),
     ]);
-    const csv = [header, ...body].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+    const csv = toCsv([header, ...body]);
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

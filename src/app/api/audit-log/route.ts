@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { auditLog, users } from "@/db/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { intParam } from "@/lib/query";
 
 // Settings → Activity: the change history, newest first. Owner only, like
 // Users and shop settings (AUDIT.md F-14).
@@ -13,8 +14,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const { searchParams } = req.nextUrl;
-    const page = Math.max(1, Number(searchParams.get("page") ?? 1) || 1);
-    const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 50) || 50));
+    const page = intParam(searchParams.get("page"), 1, 1, 1_000_000);
+    const limit = intParam(searchParams.get("limit"), 50, 1, 100);
     const entity = searchParams.get("entity");
     const entityId = searchParams.get("entityId");
 

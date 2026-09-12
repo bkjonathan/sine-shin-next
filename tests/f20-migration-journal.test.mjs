@@ -77,7 +77,7 @@ test("F-20: the journal check refuses entries drizzle would skip or never see", 
 
   const early = journalProblems(withEntry({ tag: "0013_x", when: last.when - 1 }), [...files, "0013_x.sql"]);
   assert.equal(early.length, 1, early.join("\n"));
-  assert.match(early[0], /0013_x .*not later than 0012_idempotency_keys/);
+  assert.match(early[0], new RegExp(`0013_x .*not later than ${last.tag}`));
   assert.equal(journalProblems(withEntry({ tag: "0013_x", when: last.when }), [...files, "0013_x.sql"]).length, 1, "the same time is not later");
   // The exceptions are only for 0001 and 0002 at their existing dates.
   assert.match(

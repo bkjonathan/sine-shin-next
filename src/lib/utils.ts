@@ -74,6 +74,41 @@ export function safeRedirectPath(
 }
 
 /**
+ * Returns `value` as a link target when it is an http or https URL, otherwise
+ * null. Product links are free text (staff paste share messages and app links),
+ * so anything else should be shown as plain text, not as a link (AUDIT.md F-27).
+ */
+export function safeHref(value: string | null | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value.trim());
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * CSV text from rows of cells: every cell quoted, quotes inside doubled, and a
+ * cell starting with =, +, -, @, tab or carriage return prefixed with ' so a
+ * spreadsheet shows it as text instead of running it as a formula. Plain
+ * numbers, negatives included, are left alone (AUDIT.md F-28).
+ */
+export function toCsv(rows: Array<Array<string | number | null | undefined>>): string {
+  return rows
+    .map((row) =>
+      row
+        .map((cell) => {
+          let text = String(cell ?? "");
+          if (/^[=+\-@\t\r]/.test(text) && !/^-?\d+(\.\d+)?$/.test(text)) text = `'${text}`;
+          return `"${text.replace(/"/g, '""')}"`;
+        })
+        .join(",")
+    )
+    .join("\n");
+}
+
+/**
  * Checks if the current user has the given role.
  */
 export function hasRole(userRole: string | undefined, required: string): boolean {

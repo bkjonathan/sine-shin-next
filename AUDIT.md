@@ -400,7 +400,102 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
     - Postgres messages outside class 22 are kept. The ones seen name tables, columns and constraints, not values, but I am not certain that holds for every message.
     - The SQL text is kept. Values go as placeholders, but a fragment built with `sql.raw` appears as written; I didn't check each one.
     - Auth.js's own logger is unchanged (§6 item 12).
-- **New finding F-33 (found while verifying F-06).** A database built only from drizzle/0000–0009 lacks at least four columns the code uses: `expenses.expense_id`, `expenses.title`, `expenses.expense_date` and `cargo_items.note`. (Found later, while verifying F-10: migration 0000 creates the last two expense columns under their old names, `description` and `date`, both NOT NULL. So on such a database, creating an expense also fails.) On such a database the expenses API, the trash and the public `/t/[code]` page return 500 (`errorMissingColumn`). Existing databases presumably gained these columns through `db:push` — step 2 of the tracked setup doc (memory/project_shop_manager.md:33) is `npm run db:push`. Consequences: rebuilding from migrations (disaster recovery, a new environment) yields a broken app, and production's `drizzle.__drizzle_migrations` may not reflect its real schema — so check both before running `db:migrate` there (F-20). **Not fixed:** needs a read-only look at the production schema first.
+- **New finding F-33 (found while verifying F-06).** A database built only from drizzle/0000–0009 lacks at least four columns the code uses: `expenses.expense_id`, `expenses.title`, `expenses.expense_date` and `cargo_items.note`. (Found later, while verifying F-10: migration 0000 creates the last two expense columns under their old names, `description` and `date`, both NOT NULL. So on such a database, creating an expense also fails.) On such a database the expenses API, the trash and the public `/t/[code]` page return 500 (`errorMissingColumn`). Existing databases presumably gained these columns through `db:push` — step 2 of the tracked setup doc (memory/project_shop_manager.md:33) is `npm run db:push`. Consequences: rebuilding from migrations (disaster recovery, a new environment) yields a broken app, and production's `drizzle.__drizzle_migrations` may not reflect its real schema — so check both before running `db:migrate` there (F-20). **Fixed** by migration 0013 — see F-33 below.
+- **F-23 — fixed in working tree; decision agreed with the owner on 2026-09-12.**
+  - **Decision.** The public page closes when a shipment is delivered or cancelled. There is no time limit after arrival.
+  - **Fix.**
+    - `isTrackingClosed()` (src/components/cargo/public-tracking-status.ts) is true for `cancelled` as well as `delivered`. The closed page says "Cancelled — This shipment was cancelled. Its details are no longer published here."
+    - `/t/[code]` selects only `shopName` and `logoUrl` from shop_settings. The five components that receive it (view, header, closed page, both label templates) take a new `PublicShop` type; staff pages still pass the full row, which fits it.
+    - The item note's placeholder reads "Optional note — printed on the label and shown to anyone who scans it".
+    - src/lib/public-code.ts now states the alphabet correctly: 31 characters, about 59 bits.
+  - **Verified** by `tests/f23-public-tracking.test.mjs`:
+    - which statuses close the page; the page doesn't select the whole settings row; the placeholder and the comment
+    - live: an in-transit shipment's page shows its consignee (control); a cancelled one shows neither phone nor address; neither page contains `customerIdPrefix`, `orderIdPrefix`, `cargoIdPrefix`, `defaultExchangeRate` or `currencyCode`
+
+    Before the fix every check but the control failed. Also checked in headless Chrome as an anonymous visitor: the cancelled page shows the closed message, with no phone number and no settings keys in the page.
+  - **Residual:** a shipment nobody marks delivered or cancelled stays public (by decision). The item note is public by design.
+- **F-24 — fixed in working tree.**
+  - **Fix.**
+    - The DELETE handlers for order items, cargo items, cargo payments and cargo expenses parse the body inside try/catch with a zod schema (`deleteOrderItemSchema`, `deleteCargoItemSchema`, `deleteCargoPaymentSchema`, `deleteCargoExpenseSchema`). A body that isn't JSON, a `null` body, or an id that isn't a string gets 400.
+    - They change only rows that aren't in the trash, and return 404 when nothing changed.
+    - `PATCH /api/cargo-items/:id` answers a body that isn't a JSON object with 400. The bag move and bag rename skip trashed items and return 404 ("Item not found", "Bag not found") when nothing matched.
+  - **Verified** by `tests/f24-body-handling.test.mjs`, live, for all four DELETE handlers:
+    - a malformed and a `null` body get 400, and so does a numeric id
+    - a trashed or missing row gets 404, and the trashed row's `deleted_at` is unchanged; a live row is moved to the trash
+    - moving a trashed item, and renaming a bag that only trashed items carry, get 404; renaming a bag leaves a trashed item's label alone
+
+    Before the fix all four checks failed: `{not json` gave 500, a numeric id "succeeded" with 200, and trashed rows were moved and deleted again.
+  - **Residual:** the create and edit handlers still answer a body that isn't JSON with 500, because their catch treats the parse error as a server error.
+- **F-25 — fixed in working tree.**
+  - **Fix.** `missingRecord()` (src/lib/parents.ts) looks each referenced record up inside the write's transaction with `deleted_at is null … for share`, so it can't be moved to the trash or deleted before the write commits. It returns a 404 naming the first one missing, e.g. "Cargo shipment not found". It is used by:
+    - order-item creates: the order
+    - cargo-item creates: the shipment, order, order item, customer and category
+    - payment creates: the shipment, and a receiver payment's customer
+    - expense creates: the shipment
+    - shipment creates: every item's order, order item, customer and category
+    - cargo-item edits that set a category
+
+    Inside `createOnce` a refusal also releases the idempotency key (F-13).
+  - **Verified** by `tests/f25-parent-checks.test.mjs`, live:
+    - the same writes on live records succeed (control)
+    - an order item on a trashed or missing order, and a cargo item, payment or expense on a trashed or missing shipment, get 404 and save nothing
+    - a cargo item pointing at a trashed or missing customer, a trashed order, a missing order item or a trashed or missing category; a receiver payment for a trashed customer; and a new shipment whose item has a missing category or a trashed customer all get 404 and save nothing
+    - editing a cargo item onto a trashed category gets 404 and changes nothing
+
+    Before the fix every check but the control failed: trashed parents were accepted with 201, and missing ones gave 500.
+  - **Tests updated:** F-13's "a failed create doesn't use up its key" now expects 404 (it was a foreign-key 500). F-14's "a write that fails leaves no log row" and F-22's caught log check now use a duplicate category name, which still fails inside the database. F-22's uncaught check now uses a NUL character in `GET /api/orders/:id`, since F-24 wrapped the cargo-item DELETE in try/catch.
+  - **Residual:** nothing checks that a cargo item's order item belongs to the order it names. Edits other than a cargo item's category don't re-check the records they point at.
+- **F-26 — fixed in working tree.**
+  - **Correction to the finding.** With drizzle-orm 0.45, `?page=abc` didn't give a 500: drizzle leaves out a NaN offset, so it showed page 1 with `meta.page: null`. `?limit=abc` was worse than described: a NaN limit is left out too, so every matching row came back and the 100-row cap was gone. The 500s came from `?page=1e308` (an infinite offset) and `?limit=2.5`.
+  - **Fix.** `intParam()` and `containsPattern()` in src/lib/query.ts.
+    - The orders, customers, expenses, cargo shipments, users and audit-log lists read page (1–1,000,000) and limit (1–100) with `intParam`, which uses the default for anything that isn't a finite number.
+    - All eleven search patterns use `containsPattern`, which escapes `%`, `_` and `\`.
+    - The username-taken checks on create and edit compare `lower(name) = lower(new name)`: case still counts as the same name, but `_` is no longer a wildcard.
+  - **Verified** by `tests/f26-query-parsing.test.mjs`:
+    - unit tests of both helpers; a guard that no list route reads page or limit with `Number()` and no route builds a LIKE pattern from raw input
+    - live: `?limit=abc` returns 20 of 29 matching customers; six odd values on all six lists return 200 with whole-number meta and a limit of at most 100; searches for `50%off` and `a_b` match only those names; `f26_…` can be created and renamed to next to `f26x…`/`f26y…z`; a name differing only in case is still refused
+
+    Before the fix every check failed.
+  - **Residual:** other query parameters (status, sort, dates) are unchanged, and a `dateFrom` that isn't a date still gives 500 on the summaries (the F-22 test relies on it).
+- **F-27 — fixed in working tree.**
+  - **Fix.** `safeHref()` in src/lib/utils.ts returns a URL only for http and https. The order items table makes a link only of those, and shows anything else as plain text: a `javascript:` or `data:` link, a bare domain, pasted share text. The schema is unchanged; product links stay free text, as decided under F-15.
+  - **Verified** by `tests/f27-product-link.test.mjs`: http and https become links; `javascript:` (in any case, with leading space), `data:`, `vbscript:`, protocol-relative, bare domains, share text and empty values don't; no component puts `productUrl` into an href directly. Before the fix both checks failed. In headless Chrome, an order with a `javascript:alert(1)` link and an https link showed the first as text, with no `<a href="javascript…">`, and the second as a link.
+  - **Residual:** share text that contains a URL is shown as text rather than a link; before, it was a broken link.
+- **F-28 — fixed in working tree.**
+  - **Fix.** `toCsv()` in src/lib/utils.ts quotes every cell, doubles quotes inside it, and prefixes a cell starting with `=`, `+`, `-`, `@`, tab or carriage return with `'`, unless it's a plain number. The orders, customers and expenses exports use it. The order total was already fixed under F-10.
+  - **Verified** by `tests/f28-csv-export.test.mjs` (quotes, commas and newlines, formula starts, plain and negative numbers; all three pages use the helper) and in headless Chrome, where a customer named `=HYPERLINK("http://evil.example","…")` exported as `"'=HYPERLINK(""http://evil.example"",""…"")"`. Before the fix both checks failed.
+  - **What the owner will see change:** a phone number starting with `+` exports as `'+95…`. Without the `'`, a spreadsheet reads `+95-9…` as a formula and shows the result of the subtraction.
+  - **Residual:** the exports still cover only the page on screen, as before.
+- **F-29 — fixed in working tree; decision agreed with the owner on 2026-09-12.**
+  - **Decision.** With a missing or invalid setting the server refuses to start.
+  - **Fix.**
+    - `envProblems()` in src/env.ts lists the problems with DATABASE_URL, NEXTAUTH_SECRET (at least 16 characters) and NEXTAUTH_URL, naming the setting but never its value. env.ts no longer throws when imported.
+    - src/instrumentation.ts runs it when the server starts and exits with status 1, printing "Refusing to start: invalid environment settings" and the list. It doesn't run during `next build`.
+    - src/lib/auth.ts passes `secret: process.env.NEXTAUTH_SECRET` to Auth.js, so a different AUTH_SECRET can't be used in its place.
+  - **Verified** by `tests/f29-env-check.test.mjs`: unit tests of the check, including that a value isn't printed; guards for the startup hook and auth.ts; live, `next start` with a 13-character secret exits with status 1, naming NEXTAUTH_SECRET without printing the secret. Before the fix the server kept running. `npm run build` with a 5-character NEXTAUTH_SECRET passes, so the Docker build, which has no runtime settings, isn't affected.
+  - **Deploy.** Before deploying, confirm production sets DATABASE_URL, NEXTAUTH_SECRET (at least 16 characters) and NEXTAUTH_URL (a full URL), or the container won't start. docker-compose.yml passes all three.
+  - **Residual:** setting only AUTH_SECRET is no longer enough.
+- **F-30 — risk accepted by the owner on 2026-09-12.** The tracking codes that migration 0007 backfilled with `md5(random())` stay as they are, and no labels are reprinted. Guessing one is impractical, and since F-23 a code's page closes once its shipment is delivered or cancelled, which older shipments should be. Codes the app has made since 0007 come from nanoid's secure generator.
+- **F-31** was fixed in the quick hardening batch (above).
+- **F-32 — partly done in working tree; decision agreed with the owner on 2026-09-12.**
+  - **Decision.** In-range patches only: not next-auth 5.0.0-beta.32, and not next 16.3.5.
+  - **Done.** `npm update` of axios (1.13.6 → 1.20.0), drizzle-orm (0.45.1 → 0.45.2), nanoid (5.1.7 → 5.1.16, and 3.3.11 → 3.3.19 under next and postcss), form-data (4.0.5 → 4.0.6), follow-redirects (1.15.11 → 1.16.0), proxy-from-env (1.1.0 → 2.1.0), hasown and baseline-browser-mapping. Only package-lock.json changed; package.json's ranges already allowed these. A plain `npm audit fix` would also have moved next-auth to beta.32, because `^5.0.0-beta.30` allows it, so it wasn't used.
+  - **Verified.** `npm audit --omit=dev` goes from 11 advisories (3 critical, 6 high, 2 moderate) to 5 (3 critical, 2 high). `npm run build` passes, and the full suite and both browser checks pass on the updated build; the F-18 check drives axios's PATCH and DELETE bodies.
+  - **Still open:** @auth/core 0.41.0 (critical; needs next-auth beta.32), and next 16.2.12 with its postcss and sharp (they need next 16.3.5, outside the pinned range). Appendix B §M explains why none is reachable here.
+- **F-33 — fixed in working tree; check production with the F-20 report before running 0013 there.**
+  - **Fix.** drizzle/0013_expenses_cargo_note_columns.sql renames `expenses.description` → `title` and `expenses.date` → `expense_date` only when the new name doesn't exist yet, and adds `expenses.expense_id` and `cargo_items.note` with `IF NOT EXISTS`. On a database whose columns came from `db:push`, every statement is a no-op. The F-20 report checks 0013's columns. The journal check caught a first attempt at the entry dated ten minutes in the future.
+  - **Verified** by `tests/f33-migrations-schema.test.mjs`:
+    - every migration file is run, in journal order, into a fresh schema inside a transaction that is rolled back, and its columns are compared with every column the Drizzle schema declares (listed by `tests/helpers/schema-columns.ts` with tsx)
+    - 0013, run twice on a database that already has the columns, changes nothing
+
+    Before the fix exactly the four columns above were missing; after it, none are. A schema change without a migration now fails this test.
+  - **Deploy.** Run the F-20 report against production. If 0013's columns are already there, which is expected, nothing needs doing; otherwise apply 0013's statements by hand (F-06 deploy note).
+  - **Residual:** a database that has both `description` and `title` keeps both. Some column types still differ between migration 0000 and the schema (`expenses.id` varchar(21) vs text, `expenses.category` varchar(50) vs text); neither breaks the app. Not checked against production.
+- **Verification across F-23–F-33.**
+  - Each new test ran against the unfixed code first; the failures are listed per finding.
+  - After the fixes and the dependency update: `tsc --noEmit` is clean, `npm run build` passes, and the full suite (`--test-concurrency=1`, with `AUDIT_SERVER_LOG`) passes 217 of 217 with nothing skipped, twice in a row. The server log held no raw parameter list, Postgres row detail or bcrypt hash.
+  - Headless Chrome: the F-23/F-27/F-28 check (7) and the F-18 Users-page check (17) pass on the final build.
+  - **Test hygiene.** An F-13 check ("a base-currency change waits for a money record still being saved") skips while any order, shipment, payment, expense or category exists. An earlier full run skipped it because the new tests left rows behind. The F-23, F-24 and F-25 tests, and the categories F-14 and F-22 create, now clean up after themselves, and this session's leftover rows were removed from the throwaway database; both final runs ran that check. The F-20 journal test named 0012 as the newest entry and now uses the last one.
 
 ---
 
@@ -430,17 +525,17 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
 | F-20 | MEDIUM | N Migrations | drizzle/meta/_journal.json | ✓ fixed (WT; journal checked before build and db:migrate; 0001/0002 keep their dates; production still to be checked with the read-only report — see §1a) — Journal timestamps out of order; Drizzle silently skips older migrations |
 | F-21 | MEDIUM | I Secrets | Dockerfile:15,36 | ✓ fixed (WT; see §1a) — No `.dockerignore`; `.env` can be baked into the runtime image |
 | F-22 | LOW | K Logging | src/app/api/dashboard/route.ts:150-159 | ✓ fixed (WT; 500s say only "Internal server error"; database errors are redacted in every log line; no request id — see §1a) — 500 responses return SQL text and params; failed user writes log bcrypt hashes |
-| F-23 | LOW | E Exposure | src/app/t/[code]/page.tsx:77-111 | Public tracking page stays open for cancelled shipments; full shop row sent to anonymous users |
-| F-24 | LOW | F Validation | src/app/api/cargo-items/[cargoShipmentId]/route.ts:117-134 | DELETE/bag handlers parse body outside try, don't type-check ids, touch deleted rows |
-| F-25 | LOW | G Integrity | src/app/api/cargo-payments/[cargoShipmentId]/route.ts:56-67 | Child rows can be attached to deleted or non-existent parents |
-| F-26 | LOW | F Validation | src/app/api/orders/route.ts:15-16 | `?page=abc` gives 500; LIKE wildcards unescaped; username check uses `ilike` |
-| F-27 | LOW | J XSS | src/components/orders/order-items-section.tsx:196 | `productUrl` rendered as a link without scheme validation |
-| F-28 | LOW | J Export | src/app/(dashboard)/orders/page.tsx:70-80 | CSV export doesn't escape quotes or neutralise spreadsheet formulas |
-| F-29 | LOW | I Config | src/env.ts:1-19 | Environment validation module is never imported |
-| F-30 | LOW | E Public code | drizzle/0007_cargo_item_public_code.sql:10-12 | Backfilled tracking codes generated with `md5(random())` |
+| F-23 | LOW | E Exposure | src/app/t/[code]/page.tsx:77-111 | ✓ fixed (WT; closes when delivered or cancelled, agreed with owner; only shop name and logo sent — see §1a) — Public tracking page stays open for cancelled shipments; full shop row sent to anonymous users |
+| F-24 | LOW | F Validation | src/app/api/cargo-items/[cargoShipmentId]/route.ts:117-134 | ✓ fixed (WT; see §1a) — DELETE/bag handlers parse body outside try, don't type-check ids, touch deleted rows |
+| F-25 | LOW | G Integrity | src/app/api/cargo-payments/[cargoShipmentId]/route.ts:56-67 | ✓ fixed (WT; see §1a) — Child rows can be attached to deleted or non-existent parents |
+| F-26 | LOW | F Validation | src/app/api/orders/route.ts:15-16 | ✓ fixed (WT; symptom corrected: `?limit=abc` removed the page-size cap — see §1a) — `?page=abc` gives 500; LIKE wildcards unescaped; username check uses `ilike` |
+| F-27 | LOW | J XSS | src/components/orders/order-items-section.tsx:196 | ✓ fixed (WT; only http(s) links are clickable; links stay free text per F-15 — see §1a) — `productUrl` rendered as a link without scheme validation |
+| F-28 | LOW | J Export | src/app/(dashboard)/orders/page.tsx:70-80 | ✓ fixed (WT; orders, customers and expenses exports — see §1a) — CSV export doesn't escape quotes or neutralise spreadsheet formulas |
+| F-29 | LOW | I Config | src/env.ts:1-19 | ✓ fixed (WT; the server refuses to start with bad settings, agreed with owner; check production's settings before deploying — see §1a) — Environment validation module is never imported |
+| F-30 | LOW | E Public code | drizzle/0007_cargo_item_public_code.sql:10-12 | ✓ risk accepted (owner, 2026-09-12; see §1a) — Backfilled tracking codes generated with `md5(random())` |
 | F-31 | LOW | I Deploy | docker-compose.yml:6-7,12 | ✓ fixed (WT; see §1a) — Compose publishes port 3000 on all interfaces with `AUTH_TRUST_HOST=true` |
-| F-32 | LOW | M Deps | package.json:33,38,41,43 | Advisories in axios, drizzle-orm, nanoid, @auth/core — not reachable, but should be patched |
-| F-33 | MEDIUM | N Migrations | drizzle/*.sql vs src/db/schema/expenses.ts, cargo-items.ts | Added after the audit (see §1a) — migrations never create `expenses.expense_id`/`title`/`expense_date` or `cargo_items.note`; a database built from migrations breaks expenses, trash and public tracking |
+| F-32 | LOW | M Deps | package.json:33,38,41,43 | ◐ in-range patches applied (WT; owner decision); next-auth beta bump and next 16.3.5 not done — see §1a — Advisories in axios, drizzle-orm, nanoid, @auth/core — not reachable, but should be patched |
+| F-33 | MEDIUM | N Migrations | drizzle/*.sql vs src/db/schema/expenses.ts, cargo-items.ts | ✓ fixed (WT; migration 0013, a no-op where the columns exist — see §1a) — Added after the audit — migrations never create `expenses.expense_id`/`title`/`expense_date` or `cargo_items.note`; a database built from migrations breaks expenses, trash and public tracking |
 
 ---
 
@@ -947,6 +1042,8 @@ Later entries use hand-picked midnight timestamps. Consequences:
 
 #### F-23 — Public tracking page: cancelled shipments stay public; full shop row sent to anonymous users
 
+> **Status: fixed in working tree (not committed).** The page also closes for cancelled shipments (no time limit after arrival, by decision), sends only the shop's name and logo, and the note field tells staff that anyone who scans the label sees the note. The alphabet comment is corrected. See §1a.
+
 **Area:** E Data exposure
 **Where:** src/app/t/[code]/page.tsx:39, 71, 77-111; src/components/cargo/public-tracking-status.ts:11-13.
 
@@ -960,6 +1057,8 @@ Later entries use hand-picked midnight timestamps. Consequences:
 **Effort:** Small
 
 #### F-24 — Weak body handling in DELETE and bag-edit handlers
+
+> **Status: fixed in working tree (not committed).** The four child DELETE handlers and the bag edits validate their body inside try/catch, skip trashed rows and return 404 when nothing changed. See §1a.
 
 **Area:** F Input validation
 **Where:**
@@ -981,6 +1080,8 @@ Later entries use hand-picked midnight timestamps. Consequences:
 
 #### F-25 — Child records can be attached to deleted or non-existent parents
 
+> **Status: fixed in working tree (not committed).** Creates of order items, cargo items, payments, expenses and new shipments' items, and cargo-item category edits, check every record they point at inside their transaction and return 404 if one is missing or in the trash. See §1a.
+
 **Area:** G Data integrity
 **Where:**
 
@@ -996,6 +1097,8 @@ Later entries use hand-picked midnight timestamps. Consequences:
 **Effort:** Small
 
 #### F-26 — Query-string parsing edge cases
+
+> **Status: fixed in working tree (not committed).** The six list endpoints parse page and limit into bounded whole numbers, search terms match `%` and `_` literally, and username checks compare lower-cased names. The symptoms below were described wrongly: `?page=abc` returned page 1 and `?limit=abc` removed the page-size cap; `?page=1e308` and `?limit=2.5` were the 500s. See §1a.
 
 **Area:** F Input validation
 **Where:** src/app/api/orders/route.ts:15-16 (same pattern in customers/route.ts:15-16, expenses/route.ts:15-16, cargo-shipments/route.ts:15-16 and users/route.ts:19-20); src/app/api/users/route.ts:77-81; src/app/api/users/[id]/route.ts:67-76.
@@ -1013,6 +1116,8 @@ Every value is a bound parameter, so none of this is SQL injection.
 
 #### F-27 — Product URL rendered as a link without scheme validation
 
+> **Status: fixed in working tree (not committed).** The order items table makes a link only of http and https addresses and shows any other text as text. The schema still accepts any text, as decided under F-15. See §1a.
+
 **Area:** J XSS
 **Where:** src/components/orders/order-items-section.tsx:196; src/validations/order.schema.ts:10.
 
@@ -1022,6 +1127,8 @@ Every value is a bound parameter, so none of this is SQL injection.
 **Effort:** Small
 
 #### F-28 — CSV export is not escaped
+
+> **Status: fixed in working tree (not committed).** The orders, customers and expenses exports go through one helper that quotes every cell, doubles quotes inside it and prefixes a formula-like cell with `'`. The exported order total was already fixed under F-10. See §1a.
 
 **Area:** J Export
 **Where:** src/app/(dashboard)/orders/page.tsx:70-80.
@@ -1033,6 +1140,8 @@ Every value is a bound parameter, so none of this is SQL injection.
 
 #### F-29 — Environment validation is never run
 
+> **Status: fixed in working tree (not committed).** The server checks DATABASE_URL, NEXTAUTH_SECRET and NEXTAUTH_URL when it starts and refuses to start if one is missing or invalid (owner decision); `next build` doesn't run the check. Confirm production sets all three before deploying. See §1a.
+
 **Area:** I Configuration
 **Where:** src/env.ts:1-19 (nothing imports it); src/db/index.ts:5; drizzle.config.ts:8.
 
@@ -1042,6 +1151,8 @@ Every value is a bound parameter, so none of this is SQL injection.
 **Effort:** Small
 
 #### F-30 — Backfilled tracking codes use a non-cryptographic generator
+
+> **Status: risk accepted by the owner (2026-09-12).** The codes backfilled by migration 0007 stay as they are, and no labels are reprinted. Since F-23 their pages close once a shipment is delivered or cancelled. See §1a.
 
 **Area:** E Public code
 **Where:** drizzle/0007_cargo_item_public_code.sql:10-12.
@@ -1064,6 +1175,8 @@ Every value is a bound parameter, so none of this is SQL injection.
 **Effort:** Small
 
 #### F-32 — Dependency hygiene: advisories not reachable from this code
+
+> **Status: partly done in working tree (not committed).** In-range patches only, by the owner's decision: axios, drizzle-orm, nanoid (both copies), form-data and follow-redirects are updated in package-lock.json, and `npm audit --omit=dev` goes from 11 advisories to 5. next-auth stays at 5.0.0-beta.30 (so @auth/core 0.41.0), and next 16.3.5 would be outside the pinned range. See §1a.
 
 **Area:** M Dependencies
 **Where:** package.json:33 (axios), :38 (drizzle-orm), :41 (nanoid), :43 (next-auth, which bundles @auth/core 0.41.0).

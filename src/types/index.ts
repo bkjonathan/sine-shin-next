@@ -35,6 +35,9 @@ export type NewExpense = InferInsertModel<typeof expenses>;
 
 export type ShopSettings = InferSelectModel<typeof shopSettings>;
 
+/** The shop fields the unauthenticated tracking page may show (AUDIT.md F-23). */
+export type PublicShop = Pick<ShopSettings, "shopName" | "logoUrl">;
+
 export type CargoCategory = InferSelectModel<typeof cargoCategories>;
 export type NewCargoCategory = InferInsertModel<typeof cargoCategories>;
 

@@ -4,12 +4,12 @@ import type { CargoStatus } from "@/types";
 export const JOURNEY: CargoStatus[] = ["pending", "in_transit", "arrived", "delivered"];
 
 /**
- * Once a parcel is delivered the tracking page closes: the QR sticker stays on
- * the box long after the job is done, so consignee and carrier details stop
- * being published at that point.
+ * Once a parcel is delivered, or its shipment cancelled, the tracking page
+ * closes: the QR sticker stays on the box long after the job is done, so
+ * consignee and carrier details stop being published at that point (AUDIT.md F-23).
  */
 export function isTrackingClosed(status: CargoStatus): boolean {
-  return status === "delivered";
+  return status === "delivered" || status === "cancelled";
 }
 
 export const STATUS_META: Record<CargoStatus, { label: string; className: string; dot: string }> = {

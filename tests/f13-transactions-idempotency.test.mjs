@@ -292,7 +292,8 @@ test("F-13: creates are numbered safely, saved once per submission, and settings
 
       const broken = await call("POST", `/api/cargo-items/${shipmentId}`, cookie.staff,
         { customerId, categoryId: "f13_no_such_category", weightKg: 1, carrierRatePerKg: 1, receiverRatePerKg: 1 }, keyed("failed-item"));
-      assert.equal(broken.status, 500, "an unknown category fails on its foreign key");
+      // Refused inside the transaction since F-25; before, it failed on the foreign key (500).
+      assert.equal(broken.status, 404, "an unknown category is refused");
       const fixed = await call("POST", `/api/cargo-items/${shipmentId}`, cookie.staff,
         { customerId, categoryId, weightKg: 1, carrierRatePerKg: 1, receiverRatePerKg: 1 }, keyed("failed-item"));
       assert.equal(fixed.status, 201, `corrected item, same key: ${fixed.status} ${fixed.text.slice(0, 200)}`);

@@ -3,7 +3,8 @@ import { db } from "@/db";
 import { cargoPayments, customers, shopSettings } from "@/db/schema";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { cargoPaymentSchema } from "@/validations/cargo.schema";
+import { cargoPaymentSchema, deleteCargoPaymentSchema } from "@/validations/cargo.schema";
+import { missingRecord } from "@/lib/parents";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 import { paymentCurrencyError, shopCurrency } from "@/lib/currency";
 import { withAudit } from "@/lib/audit";
@@ -66,6 +67,13 @@ export async function POST(
       const currencyError = paymentCurrencyError(parsed.data.partyType, parsed.data.currency, shopCurrency(shop));
       if (currencyError) return NextResponse.json({ error: currencyError }, { status: 400 });
 
+      // The shipment, and a receiver payment's customer, must exist and not be in the trash (AUDIT.md F-25).
+      const missing = await missingRecord(tx, [
+        ["shipment", cargoShipmentId],
+        ["customer", parsed.data.partyType === "receiver" ? parsed.data.customerId : null],
+      ]);
+      if (missing) return missing;
+
       const [payment] = await tx.insert(cargoPayments).values({
         id: nanoid(),
         cargoShipmentId,
@@ -95,13 +103,26 @@ export async function DELETE(
   if (!roleAtLeast(session, "manager")) return forbidden();
 
   const { cargoShipmentId } = await params;
-  const { paymentId } = await req.json();
+  try {
+    // A body that isn't a JSON object naming the payment is refused (AUDIT.md F-24).
+    const parsed = deleteCargoPaymentSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
+    }
 
-  if (!paymentId) return NextResponse.json({ error: "paymentId required" }, { status: 400 });
+    const [deleted] = await withAudit(req, session, (tx) => tx.update(cargoPayments)
+      .set({ deletedAt: new Date() })
+      .where(and(
+        eq(cargoPayments.id, parsed.data.paymentId),
+        eq(cargoPayments.cargoShipmentId, cargoShipmentId),
+        isNull(cargoPayments.deletedAt)
+      ))
+      .returning({ id: cargoPayments.id }));
 
-  await withAudit(req, session, (tx) => tx.update(cargoPayments)
-    .set({ deletedAt: new Date() })
-    .where(and(eq(cargoPayments.id, paymentId), eq(cargoPayments.cargoShipmentId, cargoShipmentId))));
-
-  return NextResponse.json({ data: { success: true } });
+    if (!deleted) return NextResponse.json({ error: "Payment not found" }, { status: 404 });
+    return NextResponse.json({ data: { success: true } });
+  } catch (err) {
+    console.error("[DELETE /api/cargo-payments/:cargoShipmentId]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

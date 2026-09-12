@@ -83,6 +83,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
     }),
   ],
+  // The setting src/env.ts checks at startup, so a stray AUTH_SECRET can't take its place (AUDIT.md F-29).
+  secret: process.env.NEXTAUTH_SECRET,
   // Idle timeout: the JWT is re-issued on every request, so this signs a user
   // out after 12 hours without activity rather than every 12 hours (F-06).
   session: { strategy: "jwt", maxAge: 12 * 60 * 60 },

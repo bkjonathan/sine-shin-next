@@ -100,6 +100,12 @@ export const cargoExpenseSchema = z.object({
   note: z.string().max(1000).optional().nullable(),
 });
 
+// A DELETE body names the record to move to the trash (AUDIT.md F-24).
+const recordId = z.string().min(1).max(MAX_ID);
+export const deleteCargoItemSchema = z.object({ itemId: recordId });
+export const deleteCargoPaymentSchema = z.object({ paymentId: recordId });
+export const deleteCargoExpenseSchema = z.object({ expenseId: recordId });
+
 export type CreateCargoCategoryInput = z.infer<typeof createCargoCategorySchema>;
 export type UpdateCargoCategoryInput = z.infer<typeof updateCargoCategorySchema>;
 export type CargoItemInput = z.infer<typeof cargoItemSchema>;

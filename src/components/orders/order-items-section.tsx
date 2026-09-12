@@ -11,6 +11,7 @@ import { useAddOrderItem, useRemoveOrderItem, useUpdateOrderItem } from "@/hooks
 import { useRouter } from "next/navigation";
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { OrderItem } from "@/types";
+import { safeHref } from "@/lib/utils";
 
 interface OrderItemsSectionProps {
   orderId: string;
@@ -192,11 +193,14 @@ export function OrderItemsSection({ orderId, items }: OrderItemsSectionProps) {
                 ) : (
                   <tr key={item.id} className="border-b border-divide last:border-0">
                     <td className="max-w-xs truncate px-4 py-3 text-t1">
-                      {item.productUrl ? (
-                        <a href={item.productUrl} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                      {/* Only http(s) addresses are links; other pasted text stays text (AUDIT.md F-27). */}
+                      {safeHref(item.productUrl) ? (
+                        <a href={safeHref(item.productUrl) ?? undefined} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
                           {item.productUrl}
                         </a>
-                      ) : "—"}
+                      ) : (
+                        item.productUrl || "—"
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right text-t2">{item.productQty ?? "—"}</td>
                     <td className="px-4 py-3 text-right text-t2">{item.price != null ? item.price.toFixed(2) : "—"}</td>

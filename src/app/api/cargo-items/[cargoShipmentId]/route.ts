@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { cargoItems } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { cargoItemSchema, updateCargoItemSchema } from "@/validations/cargo.schema";
+import { cargoItemSchema, updateCargoItemSchema, deleteCargoItemSchema } from "@/validations/cargo.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 import { withAudit } from "@/lib/audit";
 import { createOnce } from "@/lib/idempotency";
+import { missingRecord } from "@/lib/parents";
 
 export async function POST(
   req: NextRequest,
@@ -24,6 +25,16 @@ export async function POST(
 
     // Saved once per submission (AUDIT.md F-13).
     return await createOnce(req, session, parsed.data, async (tx) => {
+      // The shipment, and everything the item points at, must exist and not be in the trash (AUDIT.md F-25).
+      const missing = await missingRecord(tx, [
+        ["shipment", cargoShipmentId],
+        ["order", parsed.data.orderId],
+        ["orderItem", parsed.data.orderItemId],
+        ["customer", parsed.data.customerId],
+        ["category", parsed.data.categoryId],
+      ]);
+      if (missing) return missing;
+
       const [item] = await tx.insert(cargoItems).values({
         id: nanoid(),
         cargoShipmentId,
@@ -60,7 +71,11 @@ export async function PATCH(
 
   const { cargoShipmentId } = await params;
   try {
-    const body = await req.json();
+    // A body that isn't a JSON object is refused (AUDIT.md F-24).
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Request body must be a JSON object" }, { status: 400 });
+    }
     const norm = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 100) : null);
 
     if (typeof body.itemId === "string" && "weightKg" in body) {
@@ -69,31 +84,42 @@ export async function PATCH(
         return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
       }
 
-      const [item] = await withAudit(req, session, (tx) => tx.update(cargoItems)
-        .set({
-          categoryId: parsed.data.categoryId || null,
-          bagLabel: norm(parsed.data.bagLabel),
-          weightKg: parsed.data.weightKg,
-          carrierRatePerKg: parsed.data.carrierRatePerKg,
-          receiverRatePerKg: parsed.data.receiverRatePerKg,
-          note: parsed.data.note?.trim() || null,
-          updatedAt: new Date(),
-        })
-        .where(and(
-          eq(cargoItems.id, body.itemId),
-          eq(cargoItems.cargoShipmentId, cargoShipmentId),
-          isNull(cargoItems.deletedAt)
-        ))
-        .returning());
+      const result = await withAudit(req, session, async (tx) => {
+        // A new category must exist and not be in the trash (AUDIT.md F-25).
+        const missing = await missingRecord(tx, [["category", parsed.data.categoryId]]);
+        if (missing) return missing;
 
-      if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
-      return NextResponse.json({ data: item });
+        const [item] = await tx.update(cargoItems)
+          .set({
+            categoryId: parsed.data.categoryId || null,
+            bagLabel: norm(parsed.data.bagLabel),
+            weightKg: parsed.data.weightKg,
+            carrierRatePerKg: parsed.data.carrierRatePerKg,
+            receiverRatePerKg: parsed.data.receiverRatePerKg,
+            note: parsed.data.note?.trim() || null,
+            updatedAt: new Date(),
+          })
+          .where(and(
+            eq(cargoItems.id, body.itemId),
+            eq(cargoItems.cargoShipmentId, cargoShipmentId),
+            isNull(cargoItems.deletedAt)
+          ))
+          .returning();
+        return item;
+      });
+
+      if (result instanceof Response) return result;
+      if (!result) return NextResponse.json({ error: "Item not found" }, { status: 404 });
+      return NextResponse.json({ data: result });
     }
 
+    // Moving an item and renaming a bag leave trashed items alone, and say so when nothing matched (AUDIT.md F-24).
     if (typeof body.itemId === "string" && "bagLabel" in body) {
-      await withAudit(req, session, (tx) => tx.update(cargoItems)
+      const [moved] = await withAudit(req, session, (tx) => tx.update(cargoItems)
         .set({ bagLabel: norm(body.bagLabel), updatedAt: new Date() })
-        .where(and(eq(cargoItems.id, body.itemId), eq(cargoItems.cargoShipmentId, cargoShipmentId))));
+        .where(and(eq(cargoItems.id, body.itemId), eq(cargoItems.cargoShipmentId, cargoShipmentId), isNull(cargoItems.deletedAt)))
+        .returning({ id: cargoItems.id }));
+      if (!moved) return NextResponse.json({ error: "Item not found" }, { status: 404 });
       return NextResponse.json({ data: { success: true } });
     }
 
@@ -101,9 +127,11 @@ export async function PATCH(
       const from = norm(body.fromBagLabel);
       const to = norm(body.toBagLabel);
       if (!from) return NextResponse.json({ error: "fromBagLabel required" }, { status: 400 });
-      await withAudit(req, session, (tx) => tx.update(cargoItems)
+      const renamed = await withAudit(req, session, (tx) => tx.update(cargoItems)
         .set({ bagLabel: to, updatedAt: new Date() })
-        .where(and(eq(cargoItems.cargoShipmentId, cargoShipmentId), eq(cargoItems.bagLabel, from))));
+        .where(and(eq(cargoItems.cargoShipmentId, cargoShipmentId), eq(cargoItems.bagLabel, from), isNull(cargoItems.deletedAt)))
+        .returning({ id: cargoItems.id }));
+      if (renamed.length === 0) return NextResponse.json({ error: "Bag not found" }, { status: 404 });
       return NextResponse.json({ data: { success: true } });
     }
 
@@ -126,13 +154,26 @@ export async function DELETE(
   if (!roleAtLeast(session, "manager")) return forbidden();
 
   const { cargoShipmentId } = await params;
-  const { itemId } = await req.json();
+  try {
+    // A body that isn't a JSON object naming the item is refused (AUDIT.md F-24).
+    const parsed = deleteCargoItemSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
+    }
 
-  if (!itemId) return NextResponse.json({ error: "itemId required" }, { status: 400 });
+    const [deleted] = await withAudit(req, session, (tx) => tx.update(cargoItems)
+      .set({ deletedAt: new Date() })
+      .where(and(
+        eq(cargoItems.id, parsed.data.itemId),
+        eq(cargoItems.cargoShipmentId, cargoShipmentId),
+        isNull(cargoItems.deletedAt)
+      ))
+      .returning({ id: cargoItems.id }));
 
-  await withAudit(req, session, (tx) => tx.update(cargoItems)
-    .set({ deletedAt: new Date() })
-    .where(and(eq(cargoItems.id, itemId), eq(cargoItems.cargoShipmentId, cargoShipmentId))));
-
-  return NextResponse.json({ data: { success: true } });
+    if (!deleted) return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    return NextResponse.json({ data: { success: true } });
+  } catch (err) {
+    console.error("[DELETE /api/cargo-items/:cargoShipmentId]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

@@ -199,11 +199,20 @@ test("F-14: every change is recorded, attributed and append-only", { skip: liveR
     });
 
     await t.test("a write that fails leaves no log row", async () => {
-      const [{ n: before }] = await sql`select count(*)::int as n from audit_log where entity = 'order_items'`;
-      const r = await call("POST", "/api/order-items/f14_no_such_order", cookie.staff, { productQty: 1, price: 1 });
-      assert.equal(r.status, 500, "insert against a missing order fails on its foreign key");
-      const [{ n: after }] = await sql`select count(*)::int as n from audit_log where entity = 'order_items'`;
-      assert.equal(after, before);
+      // A second category with the same name fails on its unique constraint. (Since F-25 a
+      // missing parent is refused before any insert, so that no longer reaches the database.)
+      const category = { name: `F14 duplicate ${Date.now()}`, carrierRatePerKg: 1, receiverRatePerKg: 1 };
+      try {
+        assert.equal((await call("POST", "/api/cargo-categories", cookie.owner, category)).status, 201);
+        const [{ n: before }] = await sql`select count(*)::int as n from audit_log where entity = 'cargo_categories'`;
+        const r = await call("POST", "/api/cargo-categories", cookie.owner, category);
+        assert.equal(r.status, 500, "a duplicate category name fails on its unique constraint");
+        const [{ n: after }] = await sql`select count(*)::int as n from audit_log where entity = 'cargo_categories'`;
+        assert.equal(after, before);
+      } finally {
+        // F-13 skips one of its checks while any category exists.
+        await sql`delete from cargo_categories where name = ${category.name}`;
+      }
     });
 
     await t.test("a change made outside the app is still recorded, without an app user", async () => {

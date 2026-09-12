@@ -13,7 +13,7 @@ import { Plus, Download, Upload, Printer, ArrowUp, ArrowDown, LayoutGrid, List }
 import type { CreateCustomerInput } from "@/validations/customer.schema";
 import type { Customer } from "@/types";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { cn, toCsv } from "@/lib/utils";
 
 type SortOrder = "asc" | "desc";
 
@@ -73,7 +73,7 @@ export default function CustomersPage() {
       c.city ?? "",
       c.platform ?? "",
     ]);
-    const csv = [header, ...body].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+    const csv = toCsv([header, ...body]);
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

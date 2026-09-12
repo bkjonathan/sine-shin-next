@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, customers, orderItems } from "@/db/schema";
 import { isNull, desc, asc, sql, eq, and, ilike } from "drizzle-orm";
+import { containsPattern, intParam } from "@/lib/query";
 import { nanoid } from "nanoid";
 import { createOrderSchema } from "@/validations/order.schema";
 import { auth } from "@/lib/auth";
@@ -15,8 +16,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const { searchParams } = req.nextUrl;
-    const page = Math.max(1, Number(searchParams.get("page") ?? 1));
-    const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
+    const page = intParam(searchParams.get("page"), 1, 1, 1_000_000);
+    const limit = intParam(searchParams.get("limit"), 20, 1, 100);
     const search = searchParams.get("search") ?? "";
     const searchField = searchParams.get("searchField") ?? "orderId";
     const status = searchParams.get("status") ?? "";
@@ -29,8 +30,8 @@ export async function GET(req: NextRequest) {
     if (search) {
       baseConditions.push(
         searchField === "customerName"
-          ? ilike(customers.name, `%${search}%`)
-          : ilike(orders.orderId, `%${search}%`)
+          ? ilike(customers.name, containsPattern(search))
+          : ilike(orders.orderId, containsPattern(search))
       );
     }
     const whereClause = and(...(baseConditions as Parameters<typeof and>));

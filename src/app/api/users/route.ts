@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { isNull, ilike, desc, asc, sql, and, ne } from "drizzle-orm";
+import { containsPattern, intParam } from "@/lib/query";
 import { nanoid } from "nanoid";
 import { hash } from "bcryptjs";
 import { createUserSchema } from "@/validations/user.schema";
@@ -17,14 +18,14 @@ export async function GET(req: NextRequest) {
 
   try {
     const { searchParams } = req.nextUrl;
-    const page = Math.max(1, Number(searchParams.get("page") ?? 1));
-    const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
+    const page = intParam(searchParams.get("page"), 1, 1, 1_000_000);
+    const limit = intParam(searchParams.get("limit"), 20, 1, 100);
     const search = searchParams.get("search") ?? "";
     const sort = searchParams.get("sort") ?? "createdAt";
     const order = searchParams.get("order") === "asc" ? "asc" : "desc";
     const offset = (page - 1) * limit;
 
-    const searchClause = search ? ilike(users.username, `%${search}%`) : undefined;
+    const searchClause = search ? ilike(users.username, containsPattern(search)) : undefined;
     const sortCol = sort === "username" ? users.username : sort === "role" ? users.role : users.createdAt;
     const orderFn = order === "asc" ? asc : desc;
 
@@ -78,7 +79,8 @@ export async function POST(req: NextRequest) {
     const existing = await db
       .select({ id: users.id })
       .from(users)
-      .where(ilike(users.username, parsed.data.username))
+      // Case-insensitive but exact: "a_b" mustn't match "axb" (AUDIT.md F-26).
+      .where(sql`lower(${users.username}) = lower(${parsed.data.username})`)
       .limit(1);
 
     if (existing.length > 0) {

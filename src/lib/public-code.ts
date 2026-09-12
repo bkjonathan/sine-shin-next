@@ -7,7 +7,7 @@ import { customAlphabet } from "nanoid";
  *
  * The alphabet drops the look-alike characters (0/O, 1/I/L) so the code below
  * the QR can also be read out over the phone or typed in by hand when a label
- * is scuffed. 12 chars over a 32-char alphabet is 60 bits — the code is the
+ * is scuffed. 12 chars over a 31-character alphabet is about 59 bits — the code is the
  * only thing guarding the public tracking page, so it must never be derived
  * from the row id or anything else guessable.
  */

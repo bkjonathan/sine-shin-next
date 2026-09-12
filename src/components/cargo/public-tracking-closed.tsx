@@ -1,14 +1,14 @@
-import { CircleCheckBig } from "lucide-react";
+import { CircleCheckBig, CircleX } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PublicTrackingHeader } from "@/components/cargo/public-tracking-header";
 import { formatDate } from "@/lib/utils";
-import type { PublicCargoTrackingClosed, ShopSettings } from "@/types";
+import type { PublicCargoTrackingClosed, PublicShop } from "@/types";
 
 /**
- * What a scan shows once the parcel has been delivered.
+ * What a scan shows once the parcel has been delivered or its shipment cancelled.
  *
  * Deliberately a dead end: no consignee, no carrier, no note, and no label to
- * print. It confirms the delivery so a scanner knows the code was valid — a
+ * print. It confirms the outcome so a scanner knows the code was valid — a
  * bare 404 would be indistinguishable from a mistyped code — and stops there.
  */
 export function PublicTrackingClosed({
@@ -16,21 +16,30 @@ export function PublicTrackingClosed({
   shop,
 }: {
   tracking: PublicCargoTrackingClosed;
-  shop: ShopSettings | null;
+  shop: PublicShop | null;
 }) {
+  const cancelled = tracking.status === "cancelled";
   return (
     <div className="min-h-dvh bg-page">
       <PublicTrackingHeader shop={shop} status={tracking.status} />
 
       <main className="mx-auto flex max-w-3xl flex-col items-center px-4 py-12 sm:px-6 sm:py-20">
         <GlassCard padding="none" className="w-full max-w-md p-7 text-center sm:p-9">
-          <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[rgba(49,201,126,0.3)] bg-[rgba(49,201,126,0.14)]">
-            <CircleCheckBig className="h-6 w-6 text-success" />
-          </span>
+          {cancelled ? (
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[rgba(255,92,92,0.3)] bg-[rgba(255,92,92,0.14)]">
+              <CircleX className="h-6 w-6 text-danger" />
+            </span>
+          ) : (
+            <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[rgba(49,201,126,0.3)] bg-[rgba(49,201,126,0.14)]">
+              <CircleCheckBig className="h-6 w-6 text-success" />
+            </span>
+          )}
 
-          <h1 className="mt-5 text-xl font-semibold text-t1">Delivered</h1>
+          <h1 className="mt-5 text-xl font-semibold text-t1">{cancelled ? "Cancelled" : "Delivered"}</h1>
           <p className="mt-2.5 text-sm leading-6 text-t2">
-            This parcel has been delivered. Its shipment details are no longer published here.
+            {cancelled
+              ? "This shipment was cancelled. Its details are no longer published here."
+              : "This parcel has been delivered. Its shipment details are no longer published here."}
           </p>
 
           <div className="mt-6 space-y-3 border-t border-divide pt-5">

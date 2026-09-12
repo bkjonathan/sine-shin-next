@@ -7,12 +7,15 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 });
 
-const _env = envSchema.safeParse(process.env);
-
-if (!_env.success) {
-  console.error("❌ Invalid environment variables:");
-  console.error(_env.error.flatten().fieldErrors);
-  throw new Error("Invalid environment variables — check .env.local");
+/**
+ * What's wrong with the server's settings, one line per problem, naming the
+ * setting but never its value, since the lines are logged. Empty when all is
+ * well. src/instrumentation.ts runs it when the server starts and refuses to
+ * start on any problem (AUDIT.md F-29). It doesn't run on import, because
+ * `next build` runs without the runtime settings.
+ */
+export function envProblems(env: Record<string, string | undefined> = process.env): string[] {
+  const parsed = envSchema.safeParse(env);
+  if (parsed.success) return [];
+  return parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`);
 }
-
-export const env = _env.data;

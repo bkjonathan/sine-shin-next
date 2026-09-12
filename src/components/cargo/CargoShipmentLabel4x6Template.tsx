@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
-import type { ShopSettings, CargoShipment } from "@/types";
+import type { PublicShop, CargoShipment } from "@/types";
 import InvoiceQRCode from "@/components/invoice/InvoiceQRCode";
 
 // A 4in x 6in portrait label at 96 CSS dpi = 384 x 576 px. Rendered to a PNG
@@ -17,7 +17,7 @@ const LINE = "#cbd5e1";
 
 interface CargoShipmentLabel4x6TemplateProps {
   ref: RefObject<HTMLDivElement | null>;
-  shop: ShopSettings | null;
+  shop: PublicShop | null;
   shipment: Pick<CargoShipment, "cargoNo">;
   orderDisplayId: string | null;
   categoryNames: string[];

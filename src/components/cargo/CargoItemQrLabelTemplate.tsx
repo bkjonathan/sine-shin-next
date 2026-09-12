@@ -1,7 +1,7 @@
 "use client";
 
 import type { RefObject } from "react";
-import type { ShopSettings, CargoShipment } from "@/types";
+import type { PublicShop, CargoShipment } from "@/types";
 import { QrCode } from "@/components/ui/qr-code";
 
 /**
@@ -22,7 +22,7 @@ const MUTED = "#3f3f46";
 
 interface CargoItemQrLabelTemplateProps {
   ref: RefObject<HTMLDivElement | null>;
-  shop: ShopSettings | null;
+  shop: PublicShop | null;
   shipment: Pick<CargoShipment, "cargoNo">;
   /** Absolute tracking URL encoded into the QR. */
   trackingUrl: string;

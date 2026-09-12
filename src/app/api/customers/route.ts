@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { customers } from "@/db/schema";
 import { isNull, ilike, desc, asc, sql, eq } from "drizzle-orm";
+import { containsPattern, intParam } from "@/lib/query";
 import { nanoid } from "nanoid";
 import { createCustomerSchema } from "@/validations/customer.schema";
 import { auth } from "@/lib/auth";
@@ -14,8 +15,8 @@ export async function GET(req: NextRequest) {
 
   try {
     const { searchParams } = req.nextUrl;
-    const page = Math.max(1, Number(searchParams.get("page") ?? 1));
-    const limit = Math.min(100, Math.max(1, Number(searchParams.get("limit") ?? 20)));
+    const page = intParam(searchParams.get("page"), 1, 1, 1_000_000);
+    const limit = intParam(searchParams.get("limit"), 20, 1, 100);
     const search = searchParams.get("search") ?? "";
     const searchField = searchParams.get("searchField") ?? "name";
     const sort = searchParams.get("sort") ?? "customerId";
@@ -25,12 +26,12 @@ export async function GET(req: NextRequest) {
     const whereClause = isNull(customers.deletedAt);
     const searchClause = search
       ? searchField === "customerId"
-        ? ilike(customers.customerId, `%${search}%`)
+        ? ilike(customers.customerId, containsPattern(search))
         : searchField === "phone"
-        ? ilike(customers.phone, `%${search}%`)
+        ? ilike(customers.phone, containsPattern(search))
         : searchField === "all"
-        ? sql`(${ilike(customers.name, `%${search}%`)} OR ${ilike(customers.customerId, `%${search}%`)})`
-        : ilike(customers.name, `%${search}%`)
+        ? sql`(${ilike(customers.name, containsPattern(search))} OR ${ilike(customers.customerId, containsPattern(search))})`
+        : ilike(customers.name, containsPattern(search))
       : undefined;
 
     const sortCol = sort === "name" ? customers.name : sort === "createdAt" ? customers.createdAt : customers.customerId;

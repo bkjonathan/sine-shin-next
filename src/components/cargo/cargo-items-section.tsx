@@ -622,7 +622,7 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
         maxLength={500}
         value={note}
         onChange={(e) => setNote(e.target.value)}
-        placeholder="Optional note — shown on the customer label"
+        placeholder="Optional note — printed on the label and shown to anyone who scans it"
       />
     </>
   );
@@ -848,7 +848,7 @@ export function CargoItemsSection({ cargoShipmentId, items, shop, shipment, rece
             maxLength={500}
             value={editNote}
             onChange={(e) => setEditNote(e.target.value)}
-            placeholder="Optional note — shown on the customer label"
+            placeholder="Optional note — printed on the label and shown to anyone who scans it"
           />
 
           <div className="flex justify-end gap-2">

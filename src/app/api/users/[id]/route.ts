@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq, ilike, and, ne, sql } from "drizzle-orm";
+import { eq, and, ne, sql } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { updateUserSchema, deleteUserSchema } from "@/validations/user.schema";
 import { auth, verifyOwnPassword } from "@/lib/auth";
@@ -77,7 +77,8 @@ export async function PATCH(
         .from(users)
         .where(
           and(
-            ilike(users.username, parsed.data.username),
+            // Case-insensitive but exact: "a_b" mustn't match "axb" (AUDIT.md F-26).
+            sql`lower(${users.username}) = lower(${parsed.data.username})`,
             ne(users.id, id)
           )
         )

@@ -3,10 +3,11 @@ import { db } from "@/db";
 import { orderItems } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { orderItemSchema } from "@/validations/order.schema";
+import { orderItemSchema, deleteOrderItemSchema } from "@/validations/order.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 import { withAudit } from "@/lib/audit";
 import { createOnce } from "@/lib/idempotency";
+import { missingRecord } from "@/lib/parents";
 
 export async function GET(
   _req: NextRequest,
@@ -41,6 +42,10 @@ export async function POST(
 
     // Saved once per submission (AUDIT.md F-13).
     return await createOnce(req, session, parsed.data, async (tx) => {
+      // The order must exist and not be in the trash (AUDIT.md F-25).
+      const missing = await missingRecord(tx, [["order", orderId]]);
+      if (missing) return missing;
+
       const [item] = await tx.insert(orderItems).values({
         id: nanoid(),
         orderId,
@@ -112,13 +117,26 @@ export async function DELETE(
   if (!roleAtLeast(session, "manager")) return forbidden();
 
   const { orderId } = await params;
-  const { itemId } = await req.json();
+  try {
+    // A body that isn't a JSON object naming the item is refused (AUDIT.md F-24).
+    const parsed = deleteOrderItemSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
+    }
 
-  if (!itemId) return NextResponse.json({ error: "itemId required" }, { status: 400 });
+    const [deleted] = await withAudit(req, session, (tx) => tx.update(orderItems)
+      .set({ deletedAt: new Date() })
+      .where(and(
+        eq(orderItems.id, parsed.data.itemId),
+        eq(orderItems.orderId, orderId),
+        isNull(orderItems.deletedAt)
+      ))
+      .returning({ id: orderItems.id }));
 
-  await withAudit(req, session, (tx) => tx.update(orderItems)
-    .set({ deletedAt: new Date() })
-    .where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId))));
-
-  return NextResponse.json({ data: { success: true } });
+    if (!deleted) return NextResponse.json({ error: "Item not found" }, { status: 404 });
+    return NextResponse.json({ data: { success: true } });
+  } catch (err) {
+    console.error("[DELETE /api/order-items/:orderId]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

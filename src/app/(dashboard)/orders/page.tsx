@@ -12,7 +12,7 @@ import { OrderForm } from "@/components/orders/order-form";
 import { Plus, Download, Upload, Printer, ArrowUp, ArrowDown, LayoutGrid, List } from "lucide-react";
 import type { CreateOrderInput } from "@/validations/order.schema";
 import { ORDER_STATUSES } from "@/validations/order.schema";
-import { cn } from "@/lib/utils";
+import { cn, toCsv } from "@/lib/utils";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import Link from "next/link";
 
@@ -77,7 +77,7 @@ export default function OrdersPage() {
       new Date(o.createdAt).toLocaleDateString(),
       String(o.orderTotal ?? 0),
     ]);
-    const csv = [header, ...body].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
+    const csv = toCsv([header, ...body]);
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

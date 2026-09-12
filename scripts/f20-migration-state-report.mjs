@@ -46,6 +46,7 @@ const CHANGES = {
   "0010_shop_currency": `exists(select 1 from col where t = 'shop_settings' and c = 'default_exchange_rate')`,
   "0011_audit_log": `to_regclass('audit_log') is not null and exists(select 1 from pg_trigger g join pg_class k on k.oid = g.tgrelid where g.tgname = 'audit_log_record' and k.relname = 'users')`,
   "0012_idempotency_keys": `to_regclass('idempotency_keys') is not null`,
+  "0013_expenses_cargo_note_columns": `exists(select 1 from col where t = 'expenses' and c = 'title') and exists(select 1 from col where t = 'expenses' and c = 'expense_date') and exists(select 1 from col where t = 'expenses' and c = 'expense_id') and exists(select 1 from col where t = 'cargo_items' and c = 'note')`,
 };
 
 /** Builds the report using `sql`, which should be a read-only connection or transaction. */

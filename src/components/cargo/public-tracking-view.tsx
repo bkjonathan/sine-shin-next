@@ -18,11 +18,11 @@ import { downloadDataUrl } from "@/utils/downloadImage";
 import { usePublicOrigin } from "@/hooks/use-public-origin";
 import { trackingUrl } from "@/lib/tracking";
 import { formatDate, cn } from "@/lib/utils";
-import type { PublicCargoTrackingOpen, ShopSettings } from "@/types";
+import type { PublicCargoTrackingOpen, PublicShop } from "@/types";
 
 interface PublicTrackingViewProps {
   tracking: PublicCargoTrackingOpen;
-  shop: ShopSettings | null;
+  shop: PublicShop | null;
 }
 
 type Action = "print4x6" | "printQr" | "downloadQr";

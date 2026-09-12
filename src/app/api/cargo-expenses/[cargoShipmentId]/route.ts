@@ -3,7 +3,8 @@ import { db } from "@/db";
 import { cargoExpenses } from "@/db/schema";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
-import { cargoExpenseSchema } from "@/validations/cargo.schema";
+import { cargoExpenseSchema, deleteCargoExpenseSchema } from "@/validations/cargo.schema";
+import { missingRecord } from "@/lib/parents";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 import { withAudit } from "@/lib/audit";
 import { createOnce } from "@/lib/idempotency";
@@ -42,6 +43,10 @@ export async function POST(
 
     // Saved once per submission (AUDIT.md F-13).
     return await createOnce(req, session, parsed.data, async (tx) => {
+      // The shipment must exist and not be in the trash (AUDIT.md F-25).
+      const missing = await missingRecord(tx, [["shipment", cargoShipmentId]]);
+      if (missing) return missing;
+
       const [expense] = await tx.insert(cargoExpenses).values({
         id: nanoid(),
         cargoShipmentId,
@@ -68,13 +73,26 @@ export async function DELETE(
   if (!roleAtLeast(session, "manager")) return forbidden();
 
   const { cargoShipmentId } = await params;
-  const { expenseId } = await req.json();
+  try {
+    // A body that isn't a JSON object naming the expense is refused (AUDIT.md F-24).
+    const parsed = deleteCargoExpenseSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
+    }
 
-  if (!expenseId) return NextResponse.json({ error: "expenseId required" }, { status: 400 });
+    const [deleted] = await withAudit(req, session, (tx) => tx.update(cargoExpenses)
+      .set({ deletedAt: new Date() })
+      .where(and(
+        eq(cargoExpenses.id, parsed.data.expenseId),
+        eq(cargoExpenses.cargoShipmentId, cargoShipmentId),
+        isNull(cargoExpenses.deletedAt)
+      ))
+      .returning({ id: cargoExpenses.id }));
 
-  await withAudit(req, session, (tx) => tx.update(cargoExpenses)
-    .set({ deletedAt: new Date() })
-    .where(and(eq(cargoExpenses.id, expenseId), eq(cargoExpenses.cargoShipmentId, cargoShipmentId))));
-
-  return NextResponse.json({ data: { success: true } });
+    if (!deleted) return NextResponse.json({ error: "Expense not found" }, { status: 404 });
+    return NextResponse.json({ data: { success: true } });
+  } catch (err) {
+    console.error("[DELETE /api/cargo-expenses/:cargoShipmentId]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
