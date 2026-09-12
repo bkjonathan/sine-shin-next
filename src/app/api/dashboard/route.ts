@@ -155,14 +155,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    const cause   = err instanceof Error && (err as Error & { cause?: unknown }).cause
-      ? String((err as Error & { cause?: unknown }).cause)
-      : undefined;
     console.error("[GET /api/dashboard]", err);
-    return NextResponse.json(
-      { error: "Internal server error", message, cause },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

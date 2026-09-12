@@ -344,6 +344,62 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
     - The count is kept in process memory, like F-07's: a restart clears it and replicas wouldn't share it. It's per account, so anyone holding an owner's session can block that owner's Users-page changes and Settings password change for 15 minutes (not their sign-in).
     - Refused attempts aren't in the audit log: F-14 records row changes, and a refused change writes none.
     - A browser that has saved the owner's password can fill the field in, so an unattended signed-in browser is only partly covered; a copied session cookie is covered.
+- **F-20 — fixed in working tree; no migration; production still to be checked with the new report.**
+  - **How Drizzle decides.** Confirmed in drizzle-orm 0.45.1 (pg-core/dialect.js:56-71), which `drizzle-kit migrate` 0.31.10 calls. It reads only the newest `created_at` in `drizzle.__drizzle_migrations`, then runs every journal entry with a later `when`, in journal order, in one transaction. File hashes are recorded but never compared.
+  - **0001 and 0002 keep their dates.** Both were written with 2025 for 2026; their files were committed on 2026-03-31 (`edbbdf0`) and 2026-07-26 (`2f8a630`). Re-dating them isn't safe, because to migrate a database that recorded only 0000 looks the same as one that recorded 0000–0002 and nothing later. The first would get 0001 and 0002; the second would re-run 0002, whose `CREATE TABLE` has no `IF NOT EXISTS`, and fail. Left as they are, no database's next migrate changes.
+  - **Correction to the finding.** With today's migrations, a database that recorded only 0000 or 0001 doesn't end up silently without 0002: its next migrate skips 0002, fails at 0003 (which alters a 0002 table) and rolls back. The silent skip was real while 0001 or 0002 was the newest migration. This is reasoned from the SQL, not run against such a database.
+  - **Journal check.** scripts/check-migration-journal.mjs refuses a journal where:
+    - an entry isn't dated later than every entry before it
+    - an entry has no .sql file, or a .sql file has no entry
+    - `idx` isn't 0, 1, 2, … in order, `when` isn't an integer, or a tag repeats
+
+    0001 and 0002 are allowed at exactly their current values only. npm runs the check as `prebuild` and `predb:migrate`, so a mis-dated migration fails `npm run build` (the Docker build included) and stops `npm run db:migrate` before drizzle-kit starts.
+  - **Production report.** `DATABASE_URL=… node scripts/f20-migration-state-report.mjs` opens a read-only session, as the F-09 report does. For each migration it shows:
+    - whether it's recorded (a row with the same file hash)
+    - whether its changes are present (a schema check of what it creates or alters)
+    - whether `drizzle-kit migrate` would run it
+
+    It also lists recorded rows that match no file, and warns when migrate would run migrations whose changes already exist.
+  - **Verified** by `tests/f20-migration-journal.test.mjs`:
+    - The check refuses an entry dated 1 ms before 0012 or at the same time, a new entry with a legacy date, an edited 0001 date, a missing or extra .sql file, a wrong `idx`, a string `when` and a repeated tag. It accepts this journal, and this journal plus an entry dated now.
+    - package.json runs the check before `build` and `db:migrate`; it passes on this journal; no entry is dated in the future.
+    - drizzle-orm's own `migrate()`, run with a stand-in session, runs an extra migration dated 1 ms after the newest recorded one and skips, without an error, one dated 1 ms before. For every "recorded through entry k" state it runs exactly the entries after k; a database stuck at 0000 or 0001 would skip through 0002.
+    - The report, on the throwaway database, inside a transaction that is rolled back:
+      - with no migrations table, migrate would run all 13, and every migration's changes are already present
+      - with 0000–0004 recorded plus one edited row, it shows 0000–0004 recorded and migrate running 0005–0012 (the same list drizzle's own migrator gives), all eight clashing, and the edited row matching only 0003's date
+    - The report's connection refuses writes, and the command runs without printing the password.
+
+    Before the fix, 5 of 6 failed: there was no check, no report and no npm hook. The migrator test passed, because it documents drizzle's existing behaviour. On a copy of drizzle/ with an extra entry dated 1 ms before 0012, the check exits 1 and names that entry; on the real folder it exits 0. `npm run build` now prints the check's result before `next build` runs, and the build passes. `tests/f21-docker-context.test.mjs` now also requires `scripts` and `drizzle` in the Docker build context. Full suite (`--test-concurrency=1`): 178 tests pass.
+  - **Still needs the owner.** Run the report against production before the next migration. A working note from 2026-08-12 says production recorded only 0000–0004 and later migrations were applied by hand. If that still holds, `db:migrate` there would try to re-run 0005 onwards, fail and roll back, so keep applying migrations by hand (F-06 deploy note) until the report says otherwise. Recording the hand-applied migrations in the table would be a write to production and wasn't done.
+  - **Residual:**
+    - Hand-written entries must still be dated with `Date.now()`. An entry dated in the future passes the check, but the next generated migration then fails the build until the date is fixed. The F-20 test also fails on a future date.
+    - Each schema check in the report looks at one distinctive change per migration, not all of it. A new migration shows "not checked" until a check is added.
+    - F-33 is unchanged: a database built only from migrations still lacks columns the code uses.
+- **F-22 — fixed in working tree; no migration.**
+  - **Responses.** `/api/dashboard`, `/api/dashboard/orders`, `/api/dashboard/cargo`, `/api/reports` and `/api/account` now answer a failure with only `{ "error": "Internal server error" }`, like the other route handlers. Before, a `dateFrom` that isn't a date was enough to get the full SQL and the values sent back from the first four, and `/api/dashboard` also sent the Postgres error. `/api/account` reads no query parameters, so it wasn't reproduced there.
+  - **Logs.** src/lib/log-redaction.ts replaces a database error passed to `console.*` with a copy for printing:
+    - drizzle's "Failed query" keeps the SQL and says how many values were withheld, instead of listing them
+    - the Postgres error keeps its code, table, column, constraint, routine and message, but not `detail`; a NOT NULL or CHECK violation puts the whole failing row there, password hash included
+    - a class 22 (data exception) message is withheld too, because it can quote the input, e.g. `invalid input syntax for type date: "…"`
+    - the stack is kept, and the original error isn't changed, so code that handles it still sees everything
+
+    src/instrumentation.ts installs it when the server starts, on `console.error`, `warn`, `log`, `info` and `debug`. That covers the route handlers' `console.error(label, err)` calls and also the errors Next.js logs itself for the 20 database-using handlers without try/catch: Next's `Log.error` looks up `console.error` when it logs (node_modules/next/dist/build/output/log.js), so it goes through the redaction.
+  - **Removed** the `console.log` on every render of the order page.
+  - **Not done: a request id.** The proposed fix returned one with each 500. Only these five handlers would have had it unless every catch block changed, so 500s stay uniform; match a user's report to the log by route and time.
+  - **Verified** by `tests/f22-error-exposure.test.mjs`:
+    - unit tests with a real `DrizzleQueryError`: a failed users insert whose values and failing-row detail contain a bcrypt hash prints the SQL, "4 values withheld", code 23502, the table and the stack, and none of the values, the detail or the hash; the original error keeps its values
+    - a class 22 message, a bare Postgres error's detail, and a database error nested in another error's cause are redacted; anything else passes through unchanged
+    - installed on a console, every method prints the redacted form, and installing twice doesn't wrap twice
+    - no route handler reads `err.message`, `err.cause`, `err.stack` or `String(err)`; no console call interpolates an error into a string; src/instrumentation.ts installs the redaction; the order page has no `console.log`
+    - live, on a local build against the throwaway database: the four summaries answer `?dateFrom=<marker>` with only the generic error
+    - live, in the server's log: after a caught write failure (a foreign key, with the marker in its values) and an uncaught one (a NUL character in a handler without try/catch, so Next.js logs it), the marker appears nowhere, while the route labels, error codes 23503 and 22021, the constraint name and "values withheld" do
+
+    Before the fix all 7 failed. The summaries sent back the SQL with `params: <marker>`. The log held each marker three times per error (message, stack and `params`), plus `detail: 'Key (order_id)=(<marker>) is not present in table "orders".'`, and for the uncaught error Next.js's own `⨯` line printed `params: [ …, '<marker>', … ]`. After the fix all 7 pass. Full suite (`--test-concurrency=1`): 185 tests, 184 pass and 1 is skipped — F-22's log check, which needs `AUDIT_SERVER_LOG` and passed in its own run. `tsc --noEmit` is clean and `npm run build` passes. After the whole suite, the server log held no raw parameter list, no "Failing row" and no bcrypt hash.
+  - **Residual:**
+    - The redaction works on error objects. An error turned into text before logging (`${err}`, `err.message`) bypasses it; the test catches that in route handlers and log calls, but a new pattern could slip past.
+    - Postgres messages outside class 22 are kept. The ones seen name tables, columns and constraints, not values, but I am not certain that holds for every message.
+    - The SQL text is kept. Values go as placeholders, but a fragment built with `sql.raw` appears as written; I didn't check each one.
+    - Auth.js's own logger is unchanged (§6 item 12).
 - **New finding F-33 (found while verifying F-06).** A database built only from drizzle/0000–0009 lacks at least four columns the code uses: `expenses.expense_id`, `expenses.title`, `expenses.expense_date` and `cargo_items.note`. (Found later, while verifying F-10: migration 0000 creates the last two expense columns under their old names, `description` and `date`, both NOT NULL. So on such a database, creating an expense also fails.) On such a database the expenses API, the trash and the public `/t/[code]` page return 500 (`errorMissingColumn`). Existing databases presumably gained these columns through `db:push` — step 2 of the tracked setup doc (memory/project_shop_manager.md:33) is `npm run db:push`. Consequences: rebuilding from migrations (disaster recovery, a new environment) yields a broken app, and production's `drizzle.__drizzle_migrations` may not reflect its real schema — so check both before running `db:migrate` there (F-20). **Not fixed:** needs a read-only look at the production schema first.
 
 ---
@@ -371,9 +427,9 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
 | F-17 | MEDIUM | J Headers | next.config.ts:5-14 | ✓ fixed (WT; CSP still open — see §1a) — No CSP, HSTS, frame, nosniff or referrer headers; `X-Powered-By` enabled |
 | F-18 | MEDIUM | C Auth | src/app/api/users/[id]/route.ts:35-107 | ✓ fixed (WT; resets, role changes and deletes ask for the owner's own password, agreed with owner; creating a user doesn't — see §1a) — Owner resets other users' passwords/roles with no re-authentication; 6-char passwords allowed |
 | F-19 | MEDIUM | F/G Correctness | src/validations/settings.schema.ts:8-10 | ✓ fixed (WT; numbering itself is F-13 — see §1a) — Any role can set an ID prefix that breaks order/customer/shipment creation |
-| F-20 | MEDIUM | N Migrations | drizzle/meta/_journal.json | Journal timestamps out of order; Drizzle silently skips older migrations |
+| F-20 | MEDIUM | N Migrations | drizzle/meta/_journal.json | ✓ fixed (WT; journal checked before build and db:migrate; 0001/0002 keep their dates; production still to be checked with the read-only report — see §1a) — Journal timestamps out of order; Drizzle silently skips older migrations |
 | F-21 | MEDIUM | I Secrets | Dockerfile:15,36 | ✓ fixed (WT; see §1a) — No `.dockerignore`; `.env` can be baked into the runtime image |
-| F-22 | LOW | K Logging | src/app/api/dashboard/route.ts:150-159 | 500 responses return SQL text and params; failed user writes log bcrypt hashes |
+| F-22 | LOW | K Logging | src/app/api/dashboard/route.ts:150-159 | ✓ fixed (WT; 500s say only "Internal server error"; database errors are redacted in every log line; no request id — see §1a) — 500 responses return SQL text and params; failed user writes log bcrypt hashes |
 | F-23 | LOW | E Exposure | src/app/t/[code]/page.tsx:77-111 | Public tracking page stays open for cancelled shipments; full shop row sent to anonymous users |
 | F-24 | LOW | F Validation | src/app/api/cargo-items/[cargoShipmentId]/route.ts:117-134 | DELETE/bag handlers parse body outside try, don't type-check ids, touch deleted rows |
 | F-25 | LOW | G Integrity | src/app/api/cargo-payments/[cargoShipmentId]/route.ts:56-67 | Child rows can be attached to deleted or non-existent parents |
@@ -829,6 +885,8 @@ Customer numbering takes the maximum over **all** customers regardless of prefix
 
 #### F-20 — Migration journal timestamps out of order; Drizzle silently skips older entries
 
+> **Status: fixed in working tree (not committed).** A journal check runs before `npm run build` and `db:migrate` and refuses an entry dated before an earlier one; 0001 and 0002 keep their dates as named exceptions. A read-only report shows what a database recorded and what migrate would run; production hasn't been checked with it yet. See §1a.
+
 **Area:** N Maintainability
 **Where:** drizzle/meta/_journal.json; node_modules/drizzle-orm/pg-core/dialect.js:56-62.
 
@@ -863,6 +921,8 @@ Later entries use hand-picked midnight timestamps. Consequences:
 ### LOW
 
 #### F-22 — Error responses and logs expose SQL and parameters
+
+> **Status: fixed in working tree (not committed).** Failed queries answer with only "Internal server error". A redaction installed at server start strips parameter values and Postgres row details from every database error written to the logs, including the ones Next.js writes. The per-render `console.log` is gone. See §1a.
 
 **Area:** K Logging
 **Where — responses:**
@@ -1138,7 +1198,7 @@ Each finding in section 3 includes its proposed fix. This table suggests an orde
    - whether Traefik adds security headers, HSTS or rate limiting
    - whether the `admin`/`admin123` account still exists
    - whether Coolify builds with the Dockerfile or with docker-compose, whether its build context ever contains `.env`, and whether port 3000 is reachable from outside
-5. **Which migrations production actually applied (F-20).** Needs a read-only query of `drizzle.__drizzle_migrations`.
+5. **Which migrations production actually applied (F-20).** Needs a read-only query of `drizzle.__drizzle_migrations`. Now scripted: `DATABASE_URL=… node scripts/f20-migration-state-report.mjs` (read-only) also shows which migrations' changes are present and what `db:migrate` would run there (see §1a).
 6. **Business definitions of revenue, profit and service fee (F-10).** My reading comes from src/utils/invoiceCalculations.ts, which treats `serviceFee` as a percentage when `serviceFeeType` is `percent`. The owner needs to confirm what the dashboard's "revenue" is supposed to include.
 7. **Whether the cargo-item note is meant to be public (F-23).** The public view labels it "Handling note", which suggests it is.
 8. **How the middleware file is detected in production.** `middleware.ts` sits at the repo root while the app lives in `src/app`. Next.js's detection code in node_modules/next/dist/build/index.js:615-634 scans the app directory's parent (`src/`). The local Turbopack build did compile the root file (.next/server/middleware-manifest.json lists it with this matcher). Checking the production build output would confirm it is picked up there too. Next 16 also marks the `middleware` name as deprecated in favour of `proxy`.

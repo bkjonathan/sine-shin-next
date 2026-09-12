@@ -144,7 +144,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ data, meta });
   } catch (err) {
     console.error("[GET /api/dashboard/orders]", err);
-    const message = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: "Internal server error", message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

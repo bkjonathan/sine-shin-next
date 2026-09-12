@@ -62,7 +62,8 @@ test(
     for (const secretOrArtefact of [".env", ".env.local", "node_modules", ".next", ".git"]) {
       assert.ok(!entries.has(secretOrArtefact), `${secretOrArtefact} is sent to docker build`);
     }
-    for (const needed of ["Dockerfile", "package.json", "package-lock.json", "next.config.ts", "tsconfig.json", "src", "public"]) {
+    // `npm run build` first runs the migration journal check, which reads scripts/ and drizzle/ (AUDIT.md F-20).
+    for (const needed of ["Dockerfile", "package.json", "package-lock.json", "next.config.ts", "tsconfig.json", "src", "public", "scripts", "drizzle"]) {
       assert.ok(entries.has(needed), `${needed} is missing from the build context (the image build needs it)`);
     }
   }

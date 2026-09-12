@@ -12,7 +12,6 @@ interface Props {
 export default async function OrderDetailPage({ params }: Props) {
   await requireSession();
   const { id } = await params;
-  console.log(`[OrderDetail] start id=${id}`);
 
   const [order] = await db
     .select()
