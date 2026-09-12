@@ -256,6 +256,51 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
     - The client address can be forged if port 3000 is reachable without Traefik (F-31).
     - Reads aren't logged, so there's no record of who viewed what.
     - Tests seed data with direct SQL, so throwaway databases accumulate log rows that can't be removed.
+- **F-15 — fixed in working tree; decisions agreed with the owner on 2026-09-12.**
+  - **Decisions.**
+    - Any single amount is at most 1,000,000,000: fees, item prices, purchase discounts, per-kg rates, payments and expenses. That fits a receiver payment of about 10 million baht recorded in kyat.
+    - A percentage service fee is at most 100%.
+    - An item's product link may be any text up to 2,000 characters, because staff paste share text and app links. React 19 already refuses to run `javascript:` links (checked in react-dom).
+    - There is no check that a purchase discount is within the items.
+  - **Limits.** src/validations/limits.ts holds them, and every request schema uses them:
+    - amounts ≤ 1,000,000,000; exchange rates ≤ 1,000,000, including the shop's default rate (it was < 10¹²); weights ≤ 100,000 kg; quantities ≤ 1,000,000
+    - dates must be real calendar dates written YYYY-MM-DD; a blank date (`""` from an empty date input) is saved as no date
+    - order notes and product links ≤ 2,000 characters, the order source ≤ 100, IDs ≤ 36, and the three password-change fields ≤ 128, like every other password field since F-07
+    - lists ≤ 500 entries: an order's or shipment's items, and the IDs in a bulk status change
+    - the logo URL must start with http:// or https://
+
+    The forms use the same schemas, so they show these messages before anything is sent.
+  - **Percentage fee.** Creating an order checks it in the schema. The order page saves the fee and its type one at a time, so `PATCH /api/orders/:id` checks the result against the stored fee or type, inside the update's transaction with the row locked. An order already over 100% can still have its other fields edited.
+  - **Blank dates were a live bug.** On the build before this fix, an order created with the date left blank, or a shipment with blank departure and arrival dates, returned 500 (`invalid input syntax for type date: ""`). They now save with no date.
+  - **Verified** by `tests/f15-input-limits.test.mjs`:
+    - a unit test of the date check
+    - a guard that every number, string and list in the request schemas has a maximum, and that no date field accepts any text
+    - live checks on the throwaway database:
+      - two orders with a fee of 1e308 are refused, and the dashboard still loads
+      - 17 values over their limits are refused with 400; an order, a payment and an expense at the limits save
+      - impossible dates are refused with 400, 29 February 2024 saves, and blank dates as the forms send them save as no date
+      - the 100% cap on create and on single-field edits, including the legacy `%` type, while other edits of an order already over 100% still save
+      - over-long text, a 37-character customer ID, 501 items and 501 bulk IDs are refused, a 2,000-character pasted share link saves, and a `javascript:` logo is refused
+
+    Before the fix all 8 checks failed. The two 1e308 fees were stored and `/api/dashboard` then returned 500 (`value out of range: overflow`). The over-limit amounts, rates and weights were stored. A 3e9 quantity, the impossible dates and the 37-character customer ID returned 500 (`out of range for type integer`, `date/time field value out of range`, `value too long for type character varying(21)`). A 101% service fee, the over-long text, 501 items, 501 bulk IDs and the `javascript:` logo were all accepted. The blank-date 500s were confirmed with two direct requests to that build, because the test step stopped at its first failure. After the fix all 8 pass. Full suite (`--test-concurrency=1`): 163 tests pass. `tsc --noEmit` is clean and `next build` passes.
+
+    Also checked in headless Chrome, as staff:
+    - a shipment created from the form with both dates blank saved, and the form sent them as `null`
+    - an expense of 1,000,000,001 showed "Must be 1,000,000,000 or less" and was never sent
+    - on an order page, switching a fee of 500 to % returned 400, showed "A percentage service fee can be at most 100%" and put the toggle back on ฿, with the order unchanged
+
+    There were no other console errors or failed requests.
+  - **What the owner will see change:**
+    - Orders and shipments can be saved with their dates left blank.
+    - Forms show a message instead of saving an amount over 1,000,000,000, a rate over 1,000,000 or an impossible date.
+    - On the order page, switching a service fee above 100 to % is refused with a message; change the number first.
+  - **Residual:**
+    - A record already holding a value over a new limit can't be saved from a form that sends that value back, such as the item or expense edit forms, until the value is corrected. The order and shipment pages save one field at a time, so their other fields still save. Check production first: `scripts/f09-money-precision-report.mjs` reports each money column's largest value.
+    - Amounts still accept any number of decimal places; precision and rounding belong to F-09.
+    - A purchase discount larger than the items is still accepted (by decision), and there are no cross-record rules such as a payment larger than what is owed.
+    - A value refused only by the server, such as an inline edit on the order or shipment page, shows "Validation failed" rather than the specific limit. The percentage rule is the exception.
+    - IDs are capped at 36 characters, but `orders.customer_id`, `order_items.order_id` and `cargo_items.category_id` are `varchar(21)` in the database built from migrations. If production has 36-character customer IDs (src/db/schema/cargo-items.ts says `customers.id` mixes nanoids and legacy UUIDs), creating an order for such a customer fails with 500. Not certain: `customers.id` is `varchar(21)` in the throwaway database, so it needs a read-only check of production (F-33).
+    - Query-string parsing (F-26) and the unvalidated DELETE bodies (F-24) are unchanged.
 - **New finding F-33 (found while verifying F-06).** A database built only from drizzle/0000–0009 lacks at least four columns the code uses: `expenses.expense_id`, `expenses.title`, `expenses.expense_date` and `cargo_items.note`. (Found later, while verifying F-10: migration 0000 creates the last two expense columns under their old names, `description` and `date`, both NOT NULL. So on such a database, creating an expense also fails.) On such a database the expenses API, the trash and the public `/t/[code]` page return 500 (`errorMissingColumn`). Existing databases presumably gained these columns through `db:push` — step 2 of the tracked setup doc (memory/project_shop_manager.md:33) is `npm run db:push`. Consequences: rebuilding from migrations (disaster recovery, a new environment) yields a broken app, and production's `drizzle.__drizzle_migrations` may not reflect its real schema — so check both before running `db:migrate` there (F-20). **Not fixed:** needs a read-only look at the production schema first.
 
 ---
@@ -278,7 +323,7 @@ _Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the o
 | F-12 | MEDIUM | A/E Access control | src/app/api/dashboard/route.ts:28-30 | ✓ fixed (WT; summaries manager+, agreed with owner; records still visible to staff — see §1a) — Financial data blocked in `/api/reports` is served to every role by other endpoints |
 | F-13 | MEDIUM | G Correctness | src/app/api/orders/route.ts:96-126 | ✓ fixed (WT; migration 0012 must run first — see §1a) — No transactions, racy display-number generation, no idempotency |
 | F-14 | MEDIUM | K Audit | src/db/schema/index.ts:1-11 | ✓ fixed (WT; migration 0011 must run first; owner-only Activity page — see §1a) — No audit trail for any money, status, delete or user change |
-| F-15 | MEDIUM | F Validation | src/validations/order.schema.ts:10-40 | Amounts, rates, percentages and quantities have no upper bounds; dates unvalidated |
+| F-15 | MEDIUM | F Validation | src/validations/order.schema.ts:10-40 | ✓ fixed (WT; see §1a) — Amounts, rates, percentages and quantities have no upper bounds; dates unvalidated |
 | F-16 | MEDIUM | C Auth | src/app/(auth)/login/page.tsx:22,44 | ✓ fixed (WT; see §1a) — Open redirect after login via `callbackUrl` |
 | F-17 | MEDIUM | J Headers | next.config.ts:5-14 | ✓ fixed (WT; CSP still open — see §1a) — No CSP, HSTS, frame, nosniff or referrer headers; `X-Powered-By` enabled |
 | F-18 | MEDIUM | C Auth | src/app/api/users/[id]/route.ts:35-107 | ◐ password-minimum part done under F-07; re-authentication still open — Owner resets other users' passwords/roles with no re-authentication; 6-char passwords allowed |
@@ -644,6 +689,8 @@ Read `numeric` values as strings in Drizzle, and do arithmetic in integer minor 
 **Effort:** Medium
 
 #### F-15 — Numeric inputs have no upper bounds; dates and some strings unvalidated
+
+> **Status: fixed in working tree (not committed).** Every amount, rate, weight, quantity, text field, ID and list in the request schemas now has an upper limit. Dates must be real calendar dates, and a blank date means no date. A percentage service fee is capped at 100%. The limits follow the owner's decisions of 2026-09-12. See §1a.
 
 **Area:** F Input validation
 **Where:**

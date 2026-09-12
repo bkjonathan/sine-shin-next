@@ -3,11 +3,12 @@ import { orders } from "@/db/schema";
 import { and, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { ORDER_STATUSES } from "@/validations/order.schema";
+import { LIST_LIMIT, MAX_ID, MAX_LIST } from "@/validations/limits";
 import { auth } from "@/lib/auth";
 import { withAudit } from "@/lib/audit";
 
 const bulkUpdateSchema = z.object({
-  ids: z.array(z.string().min(1)).min(1, "At least one order is required"),
+  ids: z.array(z.string().min(1).max(MAX_ID)).min(1, "At least one order is required").max(MAX_LIST, LIST_LIMIT),
   status: z.enum(ORDER_STATUSES),
 });
 

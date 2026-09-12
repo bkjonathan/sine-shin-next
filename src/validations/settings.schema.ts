@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PASSWORD_MIN_LENGTH } from "./user.schema";
+import { MAX_RATE, RATE_LIMIT } from "./limits";
 
 // Letters and digits only: display numbers are parsed back with
 // split_part(id, '-', 2), so a "-" (or a LIKE wildcard) in a prefix breaks
@@ -24,7 +25,8 @@ export const updateSettingsSchema = z.object({
   shopName: z.string().min(1, "Shop name is required").max(255),
   phone: z.string().max(50).optional().nullable(),
   address: z.string().max(1000).optional().nullable(),
-  logoUrl: z.string().url("Must be a valid URL").max(500).optional().nullable().or(z.literal("")),
+  // A web address only: it's used as an image source (AUDIT.md F-15).
+  logoUrl: z.url({ protocol: /^https?$/, message: "Must be an http:// or https:// address" }).max(500).optional().nullable().or(z.literal("")),
   customerIdPrefix: idPrefix,
   orderIdPrefix: idPrefix,
   cargoIdPrefix: idPrefix,
@@ -34,15 +36,16 @@ export const updateSettingsSchema = z.object({
   currencySymbol: currencySymbol.optional(),
   exchangeCurrencyCode: currencyCode.optional(),
   exchangeCurrencySymbol: currencySymbol.optional(),
-  // Must fit the numeric(18, 6) column.
-  defaultExchangeRate: z.number().positive("Rate must be greater than 0").lt(1e12).optional(),
+  // It pre-fills the rate on new orders, shipments and payments, so it has their limit (AUDIT.md F-15).
+  defaultExchangeRate: z.number().positive("Rate must be greater than 0").max(MAX_RATE, RATE_LIMIT).optional(),
 });
 
 export const changePasswordSchema = z
   .object({
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`),
-    confirmPassword: z.string().min(1),
+    // 128, as for every other password field (AUDIT.md F-07, F-15).
+    currentPassword: z.string().min(1, "Current password is required").max(128),
+    newPassword: z.string().min(PASSWORD_MIN_LENGTH, `Password must be at least ${PASSWORD_MIN_LENGTH} characters`).max(128, "Password must be at most 128 characters"),
+    confirmPassword: z.string().min(1).max(128),
   })
   .refine((d) => d.newPassword === d.confirmPassword, {
     message: "Passwords do not match",

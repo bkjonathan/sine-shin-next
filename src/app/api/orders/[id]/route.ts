@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, customers, orderItems } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
-import { updateOrderSchema } from "@/validations/order.schema";
+import { updateOrderSchema, serviceFeeWithinLimit, SERVICE_FEE_PERCENT_LIMIT } from "@/validations/order.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
 import { withAudit } from "@/lib/audit";
 
@@ -53,15 +53,30 @@ export async function PATCH(
 
     const { items, ...orderData } = parsed.data;
 
-    // updatedAt was never set on this edit (AUDIT.md F-14).
-    const [updated] = await withAudit(req, session, (tx) => tx.update(orders)
-      .set({ ...orderData, updatedAt: new Date() })
-      .where(and(eq(orders.id, id), isNull(orders.deletedAt)))
-      .returning());
+    return await withAudit(req, session, async (tx) => {
+      // The order page saves the service fee and its type separately, so check a
+      // percentage against the stored value the edit doesn't change (AUDIT.md F-15).
+      if (orderData.serviceFee !== undefined || orderData.serviceFeeType !== undefined) {
+        const [stored] = await tx
+          .select({ serviceFee: orders.serviceFee, serviceFeeType: orders.serviceFeeType })
+          .from(orders)
+          .where(and(eq(orders.id, id), isNull(orders.deletedAt)))
+          .for("update");
+        if (stored && !serviceFeeWithinLimit(orderData.serviceFee ?? stored.serviceFee, orderData.serviceFeeType ?? stored.serviceFeeType)) {
+          return NextResponse.json({ error: SERVICE_FEE_PERCENT_LIMIT }, { status: 400 });
+        }
+      }
 
-    if (!updated) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+      // updatedAt was never set on this edit (AUDIT.md F-14).
+      const [updated] = await tx.update(orders)
+        .set({ ...orderData, updatedAt: new Date() })
+        .where(and(eq(orders.id, id), isNull(orders.deletedAt)))
+        .returning();
 
-    return NextResponse.json({ data: updated });
+      if (!updated) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+
+      return NextResponse.json({ data: updated });
+    });
   } catch (err) {
     console.error("[PATCH /api/orders/:id]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
