@@ -5,6 +5,7 @@ import { eq, and, isNull, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { cargoExpenseSchema } from "@/validations/cargo.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function GET(
   _req: NextRequest,
@@ -38,7 +39,7 @@ export async function POST(
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [expense] = await db.insert(cargoExpenses).values({
+    const [expense] = await withAudit(req, session, (tx) => tx.insert(cargoExpenses).values({
       id: nanoid(),
       cargoShipmentId,
       category: parsed.data.category,
@@ -46,7 +47,7 @@ export async function POST(
       amount: parsed.data.amount,
       incurredAt: parsed.data.incurredAt,
       note: parsed.data.note,
-    }).returning();
+    }).returning());
 
     return NextResponse.json({ data: expense }, { status: 201 });
   } catch (err) {
@@ -68,9 +69,9 @@ export async function DELETE(
 
   if (!expenseId) return NextResponse.json({ error: "expenseId required" }, { status: 400 });
 
-  await db.update(cargoExpenses)
+  await withAudit(req, session, (tx) => tx.update(cargoExpenses)
     .set({ deletedAt: new Date() })
-    .where(and(eq(cargoExpenses.id, expenseId), eq(cargoExpenses.cargoShipmentId, cargoShipmentId)));
+    .where(and(eq(cargoExpenses.id, expenseId), eq(cargoExpenses.cargoShipmentId, cargoShipmentId))));
 
   return NextResponse.json({ data: { success: true } });
 }

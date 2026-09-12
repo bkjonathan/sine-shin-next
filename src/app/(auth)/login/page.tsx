@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassButton } from "@/components/ui/glass-button";
+import { safeRedirectPath } from "@/lib/utils";
 import { BarChart3, ShieldCheck, Sparkles, Store } from "lucide-react";
 
 const loginSchema = z.object({
@@ -19,7 +20,7 @@ type LoginInput = z.infer<typeof loginSchema>;
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") ?? "/dashboard";
+  const callbackUrl = searchParams.get("callbackUrl");
   const [error, setError] = useState<string | null>(null);
 
   const {
@@ -45,7 +46,8 @@ function LoginForm() {
           : "Invalid username or password"
       );
     } else {
-      router.push(callbackUrl);
+      // Only same-origin paths: callbackUrl comes from the URL (F-16).
+      router.push(safeRedirectPath(callbackUrl, window.location.origin));
       router.refresh();
     }
   }

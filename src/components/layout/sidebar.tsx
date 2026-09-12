@@ -18,6 +18,7 @@ import {
   Plane,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { hasRole, FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
 import type { ShopSettings } from "@/types";
 
 interface SidebarProps {
@@ -32,8 +33,9 @@ const navItems = [
   { href: "/orders", label: "Orders", icon: ShoppingCart },
   { href: "/cargo", label: "Cargo", icon: Plane },
   { href: "/expenses", label: "Expenses", icon: Receipt },
-  { href: "/reports", label: "Reports", icon: BarChart3, ownerOnly: true },
-  { href: "/users", label: "Users", icon: UserCog, ownerOnly: true },
+  // Same thresholds as the APIs behind these pages (AUDIT.md F-12).
+  { href: "/reports", label: "Reports", icon: BarChart3, minRole: FINANCIAL_SUMMARY_ROLE },
+  { href: "/users", label: "Users", icon: UserCog, minRole: "owner" },
   { href: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
@@ -118,7 +120,7 @@ export function Sidebar({
   const closeMobile = () => onMobileOpenChange?.(false);
 
   const filteredNavItems = navItems.filter(
-    (item) => !("ownerOnly" in item && item.ownerOnly) || userRole === "owner"
+    (item) => !("minRole" in item) || hasRole(userRole, item.minRole)
   );
 
   useEffect(() => {

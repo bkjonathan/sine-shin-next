@@ -2,13 +2,17 @@ import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { customers, orders, orderItems, expenses } from "@/db/schema";
 import { isNull, sql, and, eq, desc } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
+import { itemsSubtotalSql } from "@/lib/order-money-sql";
 import type { DashboardOrder } from "@/types/dashboard";
 import type { Expense } from "@/types";
 
 export async function GET() {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // The Account Book is an income/expense summary: managers and the owner only (AUDIT.md F-12).
+  if (!roleAtLeast(session, FINANCIAL_SUMMARY_ROLE)) return forbidden();
 
   try {
     const [orderRows, expenseRows] = await Promise.all([
@@ -44,11 +48,7 @@ export async function GET() {
           updatedAt:          orders.updatedAt,
           deletedAt:          orders.deletedAt,
           customerName:       customers.name,
-          totalPrice: sql<number>`COALESCE((
-            SELECT SUM(COALESCE(oi.price, 0) * COALESCE(oi.product_qty, 0))
-            FROM order_items oi
-            WHERE oi.order_id = ${orders.id} AND oi.deleted_at IS NULL
-          ), 0)`,
+          totalPrice:   itemsSubtotalSql,
           totalQty:     sql<number>`0`,
           totalWeight:  sql<number>`0`,
           firstProductUrl: sql<string | null>`NULL`,

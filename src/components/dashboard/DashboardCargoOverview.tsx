@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { CargoStatusBadge } from "@/components/cargo/cargo-status-badge";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, cn } from "@/lib/utils";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
 import { DashboardStatCard } from "./DashboardStatCard";
 import type { DashboardCargoData } from "@/types/dashboard";
@@ -14,9 +14,11 @@ import type { DashboardCargoData } from "@/types/dashboard";
 interface DashboardCargoOverviewProps {
   cargo: DashboardCargoData | null;
   isLoading: boolean;
+  /** Carrier cost, receiver revenue and profit totals: managers and the owner only (AUDIT.md F-12). */
+  showTotals: boolean;
 }
 
-export function DashboardCargoOverview({ cargo, isLoading }: DashboardCargoOverviewProps) {
+export function DashboardCargoOverview({ cargo, isLoading, showTotals }: DashboardCargoOverviewProps) {
   const { prefs } = useCurrencyPrefs();
   const stats = cargo?.stats;
   const recent = cargo?.recent ?? [];
@@ -43,7 +45,7 @@ export function DashboardCargoOverview({ cargo, isLoading }: DashboardCargoOverv
         </Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+      <div className={cn("grid grid-cols-2 gap-4", showTotals && "sm:grid-cols-3 lg:grid-cols-5")}>
         <DashboardStatCard
           label="Shipments"
           value={isLoading || !stats ? "—" : stats.total_shipments}
@@ -63,30 +65,34 @@ export function DashboardCargoOverview({ cargo, isLoading }: DashboardCargoOverv
           iconBg="bg-[#64D2FF]/15"
           iconText="text-[#64D2FF]"
         />
-        <DashboardStatCard
-          label="Carrier Cost"
-          value={money(stats?.carrier_owed)}
-          sub={<p className="text-xs text-t3">Owed to carriers</p>}
-          icon={ArrowDownRight}
-          iconBg="bg-[#FF9F0A]/15"
-          iconText="text-[#FF9F0A]"
-        />
-        <DashboardStatCard
-          label="Receiver Revenue"
-          value={money(stats?.receiver_owed)}
-          sub={<p className="text-xs text-t3">Owed by receivers</p>}
-          icon={ArrowUpRight}
-          iconBg="bg-[#30D158]/15"
-          iconText="text-[#30D158]"
-        />
-        <DashboardStatCard
-          label="Cargo Profit"
-          value={money(profit)}
-          icon={positiveProfit ? TrendingUp : TrendingDown}
-          iconBg={positiveProfit ? "bg-[#30D158]/15" : "bg-[#FF3B30]/15"}
-          iconText={positiveProfit ? "text-[#30D158]" : "text-[#FF3B30]"}
-          dot={positiveProfit ? "bg-[#30D158]" : "bg-[#FF3B30]"}
-        />
+        {showTotals && (
+          <>
+            <DashboardStatCard
+              label="Carrier Cost"
+              value={money(stats?.carrier_owed)}
+              sub={<p className="text-xs text-t3">Owed to carriers</p>}
+              icon={ArrowDownRight}
+              iconBg="bg-[#FF9F0A]/15"
+              iconText="text-[#FF9F0A]"
+            />
+            <DashboardStatCard
+              label="Receiver Revenue"
+              value={money(stats?.receiver_owed)}
+              sub={<p className="text-xs text-t3">Owed by receivers</p>}
+              icon={ArrowUpRight}
+              iconBg="bg-[#30D158]/15"
+              iconText="text-[#30D158]"
+            />
+            <DashboardStatCard
+              label="Cargo Profit"
+              value={money(profit)}
+              icon={positiveProfit ? TrendingUp : TrendingDown}
+              iconBg={positiveProfit ? "bg-[#30D158]/15" : "bg-[#FF3B30]/15"}
+              iconText={positiveProfit ? "text-[#30D158]" : "text-[#FF3B30]"}
+              dot={positiveProfit ? "bg-[#30D158]" : "bg-[#FF3B30]"}
+            />
+          </>
+        )}
       </div>
 
       <GlassCard padding="none" className="mt-4">

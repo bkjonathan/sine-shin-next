@@ -5,6 +5,8 @@ import { isNull, desc, asc, sql, eq, and, ilike } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createOrderSchema } from "@/validations/order.schema";
 import { auth } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
+import { orderTotalSql } from "@/lib/order-money-sql";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -54,6 +56,7 @@ export async function GET(req: NextRequest) {
           deletedAt: orders.deletedAt,
           customerName: customers.name,
           customerDisplayId: customers.customerId,
+          orderTotal: orderTotalSql,
           totalQty: sql<number>`(SELECT COALESCE(SUM(oi.product_qty), 0)::int FROM order_items oi WHERE oi.order_id = orders.id AND oi.deleted_at IS NULL)`,
           totalWeight: sql<number>`(SELECT COALESCE(SUM(oi.product_weight), 0) FROM order_items oi WHERE oi.order_id = orders.id AND oi.deleted_at IS NULL)`,
         })
@@ -106,24 +109,28 @@ export async function POST(req: NextRequest) {
     const orderId = `${prefix}-${String(maxNum + 1).padStart(5, "0")}`;
 
     const orderId_ = nanoid();
-    const [createdOrder] = await db.insert(orders).values({
-      id: orderId_,
-      orderId,
-      ...orderData,
-    }).returning();
+    // The order and its items are saved, and recorded, together (AUDIT.md F-14).
+    const createdOrder = await withAudit(req, session, async (tx) => {
+      const [created] = await tx.insert(orders).values({
+        id: orderId_,
+        orderId,
+        ...orderData,
+      }).returning();
 
-    if (items && items.length > 0) {
-      await db.insert(orderItems).values(
-        items.map((item) => ({
-          id: nanoid(),
-          orderId: orderId_,
-          productUrl: item.productUrl,
-          productQty: item.productQty,
-          price: item.price,
-          productWeight: item.productWeight,
-        }))
-      );
-    }
+      if (items && items.length > 0) {
+        await tx.insert(orderItems).values(
+          items.map((item) => ({
+            id: nanoid(),
+            orderId: orderId_,
+            productUrl: item.productUrl,
+            productQty: item.productQty,
+            price: item.price,
+            productWeight: item.productWeight,
+          }))
+        );
+      }
+      return created;
+    });
 
     return NextResponse.json({ data: createdOrder }, { status: 201 });
   } catch (err) {

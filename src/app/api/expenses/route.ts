@@ -4,7 +4,9 @@ import { expenses } from "@/db/schema";
 import { isNull, desc, asc, sql, ilike, eq, and, gte, lte } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createExpenseSchema } from "@/validations/expense.schema";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast } from "@/lib/auth";
+import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
+import { withAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -69,12 +71,16 @@ export async function GET(req: NextRequest) {
       data: rows,
       meta: {
         page, limit, total: count, totalPages: Math.ceil(count / limit),
-        stats: {
-          records: globalStats.globalCount,
-          totalAmount: globalStats.globalTotal,
-          thisMonthAmount: globalStats.thisMonthTotal,
-          avgAmount,
-        },
+        // Expense totals are money summaries for managers and the owner; staff
+        // keep the expense records they record and edit (AUDIT.md F-12).
+        stats: roleAtLeast(session, FINANCIAL_SUMMARY_ROLE)
+          ? {
+              records: globalStats.globalCount,
+              totalAmount: globalStats.globalTotal,
+              thisMonthAmount: globalStats.thisMonthTotal,
+              avgAmount,
+            }
+          : undefined,
       },
     });
   } catch (err) {
@@ -99,11 +105,11 @@ export async function POST(req: NextRequest) {
     }).from(expenses);
     const expenseId = `EXP-${String(maxNum + 1).padStart(5, "0")}`;
 
-    const [expense] = await db.insert(expenses).values({
+    const [expense] = await withAudit(req, session, (tx) => tx.insert(expenses).values({
       id: nanoid(),
       expenseId,
       ...parsed.data,
-    }).returning();
+    }).returning());
     return NextResponse.json({ data: expense }, { status: 201 });
   } catch (err) {
     console.error("[POST /api/expenses]", err);

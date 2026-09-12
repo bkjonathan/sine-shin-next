@@ -27,6 +27,7 @@ interface OrderRow {
   deliveryFee: number;
   cargoFee: number;
   serviceFee: number;
+  orderTotal: number;
   createdAt: Date | string;
   customerName?: string | null;
   customerDisplayId?: string | null;
@@ -86,7 +87,7 @@ export function OrderTable({ orders, isLoading, pageOffset = 0 }: OrderTableProp
   const handlePrint = (o: OrderRow) => {
     const win = window.open("", "_blank", "width=400,height=320");
     if (!win) return;
-    const total = (o.shippingFee ?? 0) + (o.deliveryFee ?? 0) + (o.cargoFee ?? 0) + (o.serviceFee ?? 0);
+    const total = o.orderTotal ?? 0;
     win.document.write(`
       <html><head><title>Order Label</title>
       <style>body{font-family:sans-serif;padding:20px}h2{margin:0 0 8px}p{margin:4px 0;font-size:14px}</style>
@@ -174,11 +175,7 @@ export function OrderTable({ orders, isLoading, pageOffset = 0 }: OrderTableProp
       id: "total",
       header: "TOTAL",
       cell: ({ row }) => {
-        const total =
-          (row.original.shippingFee ?? 0) +
-          (row.original.deliveryFee ?? 0) +
-          (row.original.cargoFee ?? 0) +
-          (row.original.serviceFee ?? 0);
+        const total = row.original.orderTotal ?? 0;
         return <span className="text-sm font-semibold text-t1">{formatCurrency(total, prefs.currencySymbol)}</span>;
       },
     },

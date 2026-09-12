@@ -9,3 +9,4 @@ export { cargoShipments } from "./cargo-shipments";
 export { cargoItems } from "./cargo-items";
 export { cargoPayments } from "./cargo-payments";
 export { cargoExpenses } from "./cargo-expenses";
+export { auditLog } from "./audit-log";

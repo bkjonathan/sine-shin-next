@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
 import { expenses } from "@/db/schema";
 import { eq, isNotNull, and } from "drizzle-orm";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 // Restore a deleted expense
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -12,11 +12,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   try {
     const { id } = await params;
-    const [restored] = await db
+    const [restored] = await withAudit(req, session, (tx) => tx
       .update(expenses)
       .set({ deletedAt: null })
       .where(and(eq(expenses.id, id), isNotNull(expenses.deletedAt)))
-      .returning();
+      .returning());
 
     if (!restored) return NextResponse.json({ error: "Record not found in trash" }, { status: 404 });
     return NextResponse.json({ data: restored });
@@ -34,10 +34,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   try {
     const { id } = await params;
-    const [deleted] = await db
+    // The log keeps the whole row, so a permanent delete stays traceable (AUDIT.md F-14).
+    const [deleted] = await withAudit(req, session, (tx) => tx
       .delete(expenses)
       .where(and(eq(expenses.id, id), isNotNull(expenses.deletedAt)))
-      .returning();
+      .returning());
 
     if (!deleted) return NextResponse.json({ error: "Record not found in trash" }, { status: 404 });
     return NextResponse.json({ data: { success: true } });

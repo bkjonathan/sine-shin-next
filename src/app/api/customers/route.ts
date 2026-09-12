@@ -5,6 +5,7 @@ import { isNull, ilike, desc, asc, sql, eq } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createCustomerSchema } from "@/validations/customer.schema";
 import { auth } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -83,11 +84,11 @@ export async function POST(req: NextRequest) {
       .from(customers);
     const customerId = `${prefix}-${String(maxNum + 1).padStart(5, "0")}`;
 
-    const [customer] = await db.insert(customers).values({
+    const [customer] = await withAudit(req, session, (tx) => tx.insert(customers).values({
       id: nanoid(),
       customerId,
       ...parsed.data,
-    }).returning();
+    }).returning());
 
     return NextResponse.json({ data: customer }, { status: 201 });
   } catch (err) {

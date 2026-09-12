@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { cargoPayments, customers } from "@/db/schema";
+import { cargoPayments, customers, shopSettings } from "@/db/schema";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { cargoPaymentSchema } from "@/validations/cargo.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { paymentCurrencyError, shopCurrency } from "@/lib/currency";
+import { withAudit } from "@/lib/audit";
 
 export async function GET(
   _req: NextRequest,
@@ -53,7 +55,13 @@ export async function POST(
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [payment] = await db.insert(cargoPayments).values({
+    // Balances convert only non-base receiver payments and count carrier payments
+    // at face value, so accept only currencies that math handles (AUDIT.md F-11).
+    const [shop] = await db.select().from(shopSettings).limit(1);
+    const currencyError = paymentCurrencyError(parsed.data.partyType, parsed.data.currency, shopCurrency(shop));
+    if (currencyError) return NextResponse.json({ error: currencyError }, { status: 400 });
+
+    const [payment] = await withAudit(req, session, (tx) => tx.insert(cargoPayments).values({
       id: nanoid(),
       cargoShipmentId,
       partyType: parsed.data.partyType,
@@ -64,7 +72,7 @@ export async function POST(
       paidAt: parsed.data.paidAt,
       method: parsed.data.method,
       note: parsed.data.note,
-    }).returning();
+    }).returning());
 
     return NextResponse.json({ data: payment }, { status: 201 });
   } catch (err) {
@@ -86,9 +94,9 @@ export async function DELETE(
 
   if (!paymentId) return NextResponse.json({ error: "paymentId required" }, { status: 400 });
 
-  await db.update(cargoPayments)
+  await withAudit(req, session, (tx) => tx.update(cargoPayments)
     .set({ deletedAt: new Date() })
-    .where(and(eq(cargoPayments.id, paymentId), eq(cargoPayments.cargoShipmentId, cargoShipmentId)));
+    .where(and(eq(cargoPayments.id, paymentId), eq(cargoPayments.cargoShipmentId, cargoShipmentId))));
 
   return NextResponse.json({ data: { success: true } });
 }

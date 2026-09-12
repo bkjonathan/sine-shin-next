@@ -1,22 +1,21 @@
 import type { DashboardOrder, DashboardStats, AccountSummary, DashboardRecordType, DashboardDetailRecord } from "@/types/dashboard";
 import type { OrderItem, Expense } from "@/types";
 import { getThisMonthBounds } from "./dateUtils";
+import { itemsSubtotal, orderMoney, summarizeOrders } from "@/lib/order-money";
+
+// Money figures follow the shop-wide definitions in src/lib/order-money.ts
+// (AUDIT.md F-10); `totalPrice` on a DashboardOrder is its items subtotal.
 
 // ── 1. Order item total ───────────────────────────────────────────────────────
 
 export function calculateOrderTotalPrice(items: OrderItem[]): number {
-  return items
-    .filter((i) => !i.deletedAt)
-    .reduce((sum, i) => sum + (i.price ?? 0) * (i.productQty ?? 0), 0);
+  return itemsSubtotal(items);
 }
 
 // ── 2. Service fee ────────────────────────────────────────────────────────────
 
 export function calculateServiceFee(order: DashboardOrder): number {
-  if (order.serviceFeeType === "percent") {
-    return (order.totalPrice ?? 0) * ((order.serviceFee ?? 0) / 100);
-  }
-  return order.serviceFee ?? 0;
+  return orderMoney(order, order.totalPrice ?? 0).serviceFeeAmount;
 }
 
 // ── 3. Effective cargo fee ────────────────────────────────────────────────────
@@ -26,30 +25,25 @@ export function calculateEffectiveCargofee(order: DashboardOrder): number {
   return order.cargoFee ?? 0;
 }
 
-// ── 4. Order profit ───────────────────────────────────────────────────────────
+// ── 4. Order profit (the shop's income from one order, before expenses) ───────
 
 export function calculateOrderProfit(order: DashboardOrder): number {
-  const serviceFee     = calculateServiceFee(order);
-  const productDiscount = order.productDiscount ?? 0;
-  const shippingFee    = order.shippingFeeByShop ? (order.shippingFee ?? 0) : 0;
-  const deliveryFee    = order.deliveryFeeByShop ? (order.deliveryFee ?? 0) : 0;
-  const cargoFee       = order.cargoFeeByShop && !order.excludeCargoFee
-    ? (order.cargoFee ?? 0)
-    : 0;
-
-  return serviceFee + productDiscount + shippingFee + deliveryFee + cargoFee;
+  return orderMoney(order, order.totalPrice ?? 0).shopIncome;
 }
 
 // ── 5. Dashboard stats ────────────────────────────────────────────────────────
 
+/** `periodExpenses`: expenses dated in the same period as `orders`. */
 export function calculateDashboardStats(
   orders: DashboardOrder[],
-  _expenses: Expense[]
+  periodExpenses = 0
 ): DashboardStats {
   const active = orders.filter((o) => !o.deletedAt);
 
-  let total_revenue         = 0;
-  let total_profit          = 0;
+  const { revenue: total_revenue, profit: total_profit } = summarizeOrders(
+    active.map((o) => orderMoney(o, o.totalPrice ?? 0)),
+    periodExpenses
+  );
   let total_cargo_fee       = 0;
   let paid_cargo_fee        = 0;
   let unpaid_cargo_fee      = 0;
@@ -57,9 +51,6 @@ export function calculateDashboardStats(
   const customerIds         = new Set<string>();
 
   for (const order of active) {
-    total_revenue += order.totalPrice ?? 0;
-    total_profit  += calculateOrderProfit(order);
-
     const cargo = calculateEffectiveCargofee(order);
     total_cargo_fee += cargo;
 

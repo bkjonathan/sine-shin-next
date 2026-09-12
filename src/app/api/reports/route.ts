@@ -2,18 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { orders, orderItems, customers, expenses } from "@/db/schema";
 import { isNull, sql, and } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
+import { orderTotalSql, shopIncomeSql } from "@/lib/order-money-sql";
 import type { ReportsData } from "@/types/reports";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-  // Only owner/manager can access reports
-  const role = (session.user as { role?: string })?.role;
-  if (role !== "owner" && role !== "manager") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
+  // Money summaries are for managers and the owner (AUDIT.md F-12).
+  if (!roleAtLeast(session, FINANCIAL_SUMMARY_ROLE)) return forbidden();
 
   const { searchParams } = req.nextUrl;
   const dateFrom = searchParams.get("dateFrom");
@@ -45,17 +43,12 @@ export async function GET(req: NextRequest) {
       monthlyCargoRows,
       customerCountRows,
     ] = await Promise.all([
-      // KPI: order-based metrics
+      // KPI: order-based metrics (definitions: src/lib/order-money.ts)
       db.select({
-        totalRevenue: sql<number>`COALESCE(SUM(
-          COALESCE(${orders.shippingFee},0) + COALESCE(${orders.deliveryFee},0) +
-          COALESCE(${orders.cargoFee},0) + COALESCE(${orders.serviceFee},0)
-        ), 0)`,
+        totalRevenue: sql<number>`COALESCE(SUM(${orderTotalSql}), 0)`,
+        totalIncome: sql<number>`COALESCE(SUM(${shopIncomeSql}), 0)`,
         totalOrders: sql<number>`COUNT(*)::int`,
-        avgOrderValue: sql<number>`COALESCE(AVG(
-          COALESCE(${orders.shippingFee},0) + COALESCE(${orders.deliveryFee},0) +
-          COALESCE(${orders.cargoFee},0) + COALESCE(${orders.serviceFee},0)
-        ), 0)`,
+        avgOrderValue: sql<number>`COALESCE(AVG(${orderTotalSql}), 0)`,
         totalCargo: sql<number>`COALESCE(SUM(CASE WHEN exclude_cargo_fee IS NOT TRUE THEN cargo_fee ELSE 0 END), 0)`,
         paidCargo: sql<number>`COALESCE(SUM(CASE WHEN cargo_fee_paid = TRUE AND exclude_cargo_fee IS NOT TRUE THEN cargo_fee ELSE 0 END), 0)`,
       }).from(orders).where(orderWhere),
@@ -68,23 +61,8 @@ export async function GET(req: NextRequest) {
       // Monthly revenue (from orders)
       db.select({
         month: sql<string>`TO_CHAR(COALESCE(orders.order_date::date, orders.created_at::date), 'YYYY-MM')`,
-        revenue: sql<number>`COALESCE(SUM(
-          COALESCE(${orders.shippingFee},0) + COALESCE(${orders.deliveryFee},0) +
-          COALESCE(${orders.cargoFee},0) + COALESCE(${orders.serviceFee},0)
-        ), 0)`,
-        profit: sql<number>`COALESCE(SUM(
-          CASE WHEN ${orders.serviceFeeType} = 'percent'
-            THEN COALESCE(
-              (SELECT SUM(COALESCE(oi.price,0)*COALESCE(oi.product_qty,0)) FROM order_items oi WHERE oi.order_id = orders.id AND oi.deleted_at IS NULL),
-              0
-            ) * (COALESCE(${orders.serviceFee},0) / 100.0)
-            ELSE COALESCE(${orders.serviceFee},0)
-          END
-          + COALESCE(${orders.productDiscount},0)
-          + CASE WHEN ${orders.shippingFeeByShop} = TRUE THEN COALESCE(${orders.shippingFee},0) ELSE 0 END
-          + CASE WHEN ${orders.deliveryFeeByShop} = TRUE THEN COALESCE(${orders.deliveryFee},0) ELSE 0 END
-          + CASE WHEN ${orders.cargoFeeByShop} = TRUE AND ${orders.excludeCargoFee} IS NOT TRUE THEN COALESCE(${orders.cargoFee},0) ELSE 0 END
-        ), 0)`,
+        revenue: sql<number>`COALESCE(SUM(${orderTotalSql}), 0)`,
+        income: sql<number>`COALESCE(SUM(${shopIncomeSql}), 0)`,
         orderCount: sql<number>`COUNT(*)::int`,
       }).from(orders)
         .where(orderWhere)
@@ -110,10 +88,7 @@ export async function GET(req: NextRequest) {
       db.select({
         platform: sql<string>`COALESCE(${orders.orderFrom}, 'Unknown')`,
         count: sql<number>`COUNT(*)::int`,
-        revenue: sql<number>`COALESCE(SUM(
-          COALESCE(${orders.shippingFee},0) + COALESCE(${orders.deliveryFee},0) +
-          COALESCE(${orders.cargoFee},0) + COALESCE(${orders.serviceFee},0)
-        ), 0)`,
+        revenue: sql<number>`COALESCE(SUM(${orderTotalSql}), 0)`,
       }).from(orders)
         .where(orderWhere)
         .groupBy(sql`COALESCE(${orders.orderFrom}, 'Unknown')`)
@@ -124,18 +99,12 @@ export async function GET(req: NextRequest) {
         customerId: customers.customerId,
         customerName: customers.name,
         orderCount: sql<number>`COUNT(orders.id)::int`,
-        totalRevenue: sql<number>`COALESCE(SUM(
-          COALESCE(${orders.shippingFee},0) + COALESCE(${orders.deliveryFee},0) +
-          COALESCE(${orders.cargoFee},0) + COALESCE(${orders.serviceFee},0)
-        ), 0)`,
+        totalRevenue: sql<number>`COALESCE(SUM(${orderTotalSql}), 0)`,
       }).from(orders)
         .innerJoin(customers, sql`orders.customer_id = customers.id`)
         .where(orderWhere)
         .groupBy(customers.customerId, customers.name)
-        .orderBy(sql`SUM(
-          COALESCE(${orders.shippingFee},0) + COALESCE(${orders.deliveryFee},0) +
-          COALESCE(${orders.cargoFee},0) + COALESCE(${orders.serviceFee},0)
-        ) DESC`)
+        .orderBy(sql`SUM(${orderTotalSql}) DESC`)
         .limit(10),
 
       // Customer growth — by first order month
@@ -178,8 +147,8 @@ export async function GET(req: NextRequest) {
     const totalCargo = Number(kpiRows[0]?.totalCargo ?? 0);
     const paidCargo = Number(kpiRows[0]?.paidCargo ?? 0);
 
-    // Calculate total profit from monthly data for accuracy
-    const totalProfit = monthlyRevenueRows.reduce((sum, r) => sum + Number(r.profit ?? 0), 0);
+    // Profit = shop income − expenses dated in the same period (F-10).
+    const totalProfit = Number(kpiRows[0]?.totalIncome ?? 0) - totalExpenses;
 
     const kpi = {
       totalRevenue,
@@ -202,7 +171,7 @@ export async function GET(req: NextRequest) {
         month,
         label: formatMonthLabel(month),
         revenue,
-        profit: Number(r.profit),
+        profit: Number(r.income) - (expenseMap.get(month) ?? 0),
         expenses: expenseMap.get(month) ?? 0,
         orderCount,
         avgOrderValue: orderCount > 0 ? revenue / orderCount : 0,

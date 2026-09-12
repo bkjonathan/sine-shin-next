@@ -5,6 +5,7 @@ import { isNull, desc, asc, sql, eq, and, or, ilike } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createCargoShipmentSchema } from "@/validations/cargo.schema";
 import { auth } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -99,27 +100,31 @@ export async function POST(req: NextRequest) {
     const cargoNo = `${prefix}-${String(maxNum + 1).padStart(5, "0")}`;
 
     const shipmentId = nanoid();
-    const [createdShipment] = await db.insert(cargoShipments).values({
-      id: shipmentId,
-      cargoNo,
-      ...shipmentData,
-    }).returning();
+    // The shipment and its items are saved, and recorded, together (AUDIT.md F-14).
+    const createdShipment = await withAudit(req, session, async (tx) => {
+      const [created] = await tx.insert(cargoShipments).values({
+        id: shipmentId,
+        cargoNo,
+        ...shipmentData,
+      }).returning();
 
-    if (items && items.length > 0) {
-      await db.insert(cargoItems).values(
-        items.map((item) => ({
-          id: nanoid(),
-          cargoShipmentId: shipmentId,
-          orderId: item.orderId ?? null,
-          customerId: item.customerId ?? null,
-          orderItemId: item.orderItemId,
-          categoryId: item.categoryId,
-          weightKg: item.weightKg,
-          carrierRatePerKg: item.carrierRatePerKg,
-          receiverRatePerKg: item.receiverRatePerKg,
-        }))
-      );
-    }
+      if (items && items.length > 0) {
+        await tx.insert(cargoItems).values(
+          items.map((item) => ({
+            id: nanoid(),
+            cargoShipmentId: shipmentId,
+            orderId: item.orderId ?? null,
+            customerId: item.customerId ?? null,
+            orderItemId: item.orderItemId,
+            categoryId: item.categoryId,
+            weightKg: item.weightKg,
+            carrierRatePerKg: item.carrierRatePerKg,
+            receiverRatePerKg: item.receiverRatePerKg,
+          }))
+        );
+      }
+      return created;
+    });
 
     return NextResponse.json({ data: createdShipment }, { status: 201 });
   } catch (err) {

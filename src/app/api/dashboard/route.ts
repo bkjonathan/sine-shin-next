@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { customers, orders, expenses } from "@/db/schema";
 import { isNull, sql, and, eq, desc } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
+import { orderTotalSql, shopIncomeSql } from "@/lib/order-money-sql";
 
 // All date column names (from hardcoded map — never from user input directly)
 const DATE_COL_SQL = {
@@ -28,6 +30,8 @@ function buildDateCondition(field: DateField, from: string, to: string) {
 export async function GET(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  // Revenue and profit summary: managers and the owner only (AUDIT.md F-12).
+  if (!roleAtLeast(session, FINANCIAL_SUMMARY_ROLE)) return forbidden();
 
   const { searchParams } = req.nextUrl;
   const dateFrom  = searchParams.get("dateFrom");
@@ -59,6 +63,11 @@ export async function GET(req: NextRequest) {
 
     const where = and(...conds);
 
+    // Expenses dated in the same period, so profit subtracts only those (F-10).
+    const expenseConds = [isNull(expenses.deletedAt)] as ReturnType<typeof sql>[];
+    if (dateFrom) expenseConds.push(sql`${expenses.date} >= ${dateFrom}::date`);
+    if (dateTo) expenseConds.push(sql`${expenses.date} <= ${dateTo}::date`);
+
     // ── Run queries in parallel ──────────────────────────────────────
     const [
       [financial],
@@ -68,10 +77,11 @@ export async function GET(req: NextRequest) {
       [{ totalExpenses }],
       recentActivity,
     ] = await Promise.all([
-      // Financial overview
+      // Financial overview (definitions: src/lib/order-money.ts). netRevenue is
+      // the shop's own income: service fee + purchase discount + "Shop" fees.
       db.select({
-        totalRevenue: sql<number>`COALESCE(SUM(COALESCE(${orders.shippingFee},0) + COALESCE(${orders.deliveryFee},0) + COALESCE(${orders.cargoFee},0) + COALESCE(${orders.serviceFee},0)), 0)`,
-        netRevenue:   sql<number>`COALESCE(SUM(COALESCE(${orders.shippingFee},0) + COALESCE(${orders.deliveryFee},0) + COALESCE(${orders.serviceFee},0)), 0)`,
+        totalRevenue: sql<number>`COALESCE(SUM(${orderTotalSql}), 0)`,
+        netRevenue:   sql<number>`COALESCE(SUM(${shopIncomeSql}), 0)`,
         orderCount:   sql<number>`COUNT(*)::int`,
       }).from(orders).where(where),
 
@@ -86,7 +96,7 @@ export async function GET(req: NextRequest) {
       // Counts
       db.select({ totalOrders:    sql<number>`COUNT(*)::int` }).from(orders).where(where),
       db.select({ totalCustomers: sql<number>`COUNT(*)::int` }).from(customers).where(isNull(customers.deletedAt)),
-      db.select({ totalExpenses:  sql<number>`COALESCE(SUM(amount), 0)` }).from(expenses).where(isNull(expenses.deletedAt)),
+      db.select({ totalExpenses:  sql<number>`COALESCE(SUM(amount), 0)` }).from(expenses).where(and(...expenseConds)),
 
       // Recent activity — orders + customer names
       db.select({
@@ -96,10 +106,7 @@ export async function GET(req: NextRequest) {
         createdAt:         orders.createdAt,
         customerName:      customers.name,
         customerDisplayId: customers.customerId,
-        total: sql<number>`(
-          COALESCE(${orders.shippingFee}, 0) + COALESCE(${orders.deliveryFee}, 0) +
-          COALESCE(${orders.cargoFee}, 0)    + COALESCE(${orders.serviceFee}, 0)
-        )`,
+        total:             orderTotalSql,
       })
         .from(orders)
         .leftJoin(customers, eq(orders.customerId, customers.id))
@@ -124,7 +131,7 @@ export async function GET(req: NextRequest) {
         financial: {
           totalRevenue,
           netRevenue,
-          totalProfit:    totalRevenue - totalExp,
+          totalProfit:    netRevenue - totalExp,
           avgOrderValue:  orderCount > 0 ? totalRevenue / orderCount : 0,
         },
         operations: {

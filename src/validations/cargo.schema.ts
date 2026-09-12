@@ -75,7 +75,8 @@ export const cargoPaymentSchema = z
     partyType: z.enum(CARGO_PARTY_TYPES),
     customerId: z.string().optional().nullable(),
     amount: z.number().positive("Amount must be greater than 0"),
-    currency: z.string().min(1, "Currency is required").max(10),
+    // Which currencies are allowed depends on shop settings; checked in the route (AUDIT.md F-11).
+    currency: z.string().trim().toUpperCase().min(1, "Currency is required").max(10),
     exchangeRate: z.number().positive().optional().nullable(),
     paidAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD"),
     method: z.string().max(50).optional().nullable(),

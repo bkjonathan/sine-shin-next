@@ -54,6 +54,26 @@ export function escapeHtml(value: string | number): string {
 }
 
 /**
+ * Returns `value` as a same-origin path (path + query + hash) when it is a
+ * relative URL that resolves to `origin`, otherwise `fallback`. Resolving with
+ * the browser's own URL parser defeats "//host", "/\host" and control-character
+ * tricks. Use for any redirect target taken from the URL (AUDIT.md F-16).
+ */
+export function safeRedirectPath(
+  value: string | null | undefined,
+  origin: string,
+  fallback = "/dashboard"
+): string {
+  if (!value || !value.startsWith("/")) return fallback;
+  try {
+    const url = new URL(value, origin);
+    return url.origin === origin ? `${url.pathname}${url.search}${url.hash}` : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+/**
  * Checks if the current user has the given role.
  */
 export function hasRole(userRole: string | undefined, required: string): boolean {

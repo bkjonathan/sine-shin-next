@@ -5,6 +5,7 @@ import { eq, isNull, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { orderItemSchema } from "@/validations/order.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function GET(
   _req: NextRequest,
@@ -37,14 +38,14 @@ export async function POST(
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [item] = await db.insert(orderItems).values({
+    const [item] = await withAudit(req, session, (tx) => tx.insert(orderItems).values({
       id: nanoid(),
       orderId,
       productUrl: parsed.data.productUrl,
       productQty: parsed.data.productQty,
       price: parsed.data.price,
       productWeight: parsed.data.productWeight,
-    }).returning();
+    }).returning());
 
     return NextResponse.json({ data: item }, { status: 201 });
   } catch (err) {
@@ -78,7 +79,7 @@ export async function PATCH(
     if ("price" in rest) values.price = parsed.data.price;
     if ("productWeight" in rest) values.productWeight = parsed.data.productWeight;
 
-    const [item] = await db
+    const [item] = await withAudit(req, session, (tx) => tx
       .update(orderItems)
       .set(values)
       .where(
@@ -88,7 +89,7 @@ export async function PATCH(
           isNull(orderItems.deletedAt)
         )
       )
-      .returning();
+      .returning());
 
     if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
 
@@ -112,9 +113,9 @@ export async function DELETE(
 
   if (!itemId) return NextResponse.json({ error: "itemId required" }, { status: 400 });
 
-  await db.update(orderItems)
+  await withAudit(req, session, (tx) => tx.update(orderItems)
     .set({ deletedAt: new Date() })
-    .where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId)));
+    .where(and(eq(orderItems.id, itemId), eq(orderItems.orderId, orderId))));
 
   return NextResponse.json({ data: { success: true } });
 }

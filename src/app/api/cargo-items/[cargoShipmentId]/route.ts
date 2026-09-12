@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
 import { cargoItems } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { cargoItemSchema, updateCargoItemSchema } from "@/validations/cargo.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function POST(
   req: NextRequest,
@@ -21,7 +21,7 @@ export async function POST(
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [item] = await db.insert(cargoItems).values({
+    const [item] = await withAudit(req, session, (tx) => tx.insert(cargoItems).values({
       id: nanoid(),
       cargoShipmentId,
       orderId: parsed.data.orderId ?? null,
@@ -33,7 +33,7 @@ export async function POST(
       carrierRatePerKg: parsed.data.carrierRatePerKg,
       receiverRatePerKg: parsed.data.receiverRatePerKg,
       note: parsed.data.note ?? null,
-    }).returning();
+    }).returning());
 
     return NextResponse.json({ data: item }, { status: 201 });
   } catch (err) {
@@ -66,7 +66,7 @@ export async function PATCH(
         return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
       }
 
-      const [item] = await db.update(cargoItems)
+      const [item] = await withAudit(req, session, (tx) => tx.update(cargoItems)
         .set({
           categoryId: parsed.data.categoryId || null,
           bagLabel: norm(parsed.data.bagLabel),
@@ -81,16 +81,16 @@ export async function PATCH(
           eq(cargoItems.cargoShipmentId, cargoShipmentId),
           isNull(cargoItems.deletedAt)
         ))
-        .returning();
+        .returning());
 
       if (!item) return NextResponse.json({ error: "Item not found" }, { status: 404 });
       return NextResponse.json({ data: item });
     }
 
     if (typeof body.itemId === "string" && "bagLabel" in body) {
-      await db.update(cargoItems)
+      await withAudit(req, session, (tx) => tx.update(cargoItems)
         .set({ bagLabel: norm(body.bagLabel), updatedAt: new Date() })
-        .where(and(eq(cargoItems.id, body.itemId), eq(cargoItems.cargoShipmentId, cargoShipmentId)));
+        .where(and(eq(cargoItems.id, body.itemId), eq(cargoItems.cargoShipmentId, cargoShipmentId))));
       return NextResponse.json({ data: { success: true } });
     }
 
@@ -98,9 +98,9 @@ export async function PATCH(
       const from = norm(body.fromBagLabel);
       const to = norm(body.toBagLabel);
       if (!from) return NextResponse.json({ error: "fromBagLabel required" }, { status: 400 });
-      await db.update(cargoItems)
+      await withAudit(req, session, (tx) => tx.update(cargoItems)
         .set({ bagLabel: to, updatedAt: new Date() })
-        .where(and(eq(cargoItems.cargoShipmentId, cargoShipmentId), eq(cargoItems.bagLabel, from)));
+        .where(and(eq(cargoItems.cargoShipmentId, cargoShipmentId), eq(cargoItems.bagLabel, from))));
       return NextResponse.json({ data: { success: true } });
     }
 
@@ -127,9 +127,9 @@ export async function DELETE(
 
   if (!itemId) return NextResponse.json({ error: "itemId required" }, { status: 400 });
 
-  await db.update(cargoItems)
+  await withAudit(req, session, (tx) => tx.update(cargoItems)
     .set({ deletedAt: new Date() })
-    .where(and(eq(cargoItems.id, itemId), eq(cargoItems.cargoShipmentId, cargoShipmentId)));
+    .where(and(eq(cargoItems.id, itemId), eq(cargoItems.cargoShipmentId, cargoShipmentId))));
 
   return NextResponse.json({ data: { success: true } });
 }

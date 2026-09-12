@@ -4,7 +4,9 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      # Localhost only: Traefik reaches the container over the Docker network,
+      # and a public host port would bypass it and TLS (AUDIT.md F-31).
+      - "127.0.0.1:3000:3000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
       - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}

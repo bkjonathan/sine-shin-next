@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { customers, orders, orderItems } from "@/db/schema";
+import { customers, orders, orderItems, expenses } from "@/db/schema";
 import { isNull, sql, and, eq, desc } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast } from "@/lib/auth";
+import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
+import { itemsSubtotalSql } from "@/lib/order-money-sql";
 import type { DashboardOrder } from "@/types/dashboard";
 
 // Whitelist of date column SQL — never interpolate user input directly
@@ -56,8 +58,15 @@ export async function GET(req: NextRequest) {
 
     const where = and(...conds);
 
+    // Expenses dated in the same period, so dashboard profit subtracts only
+    // those (AUDIT.md F-10). The order status filter doesn't apply to expenses.
+    const expenseConds = [isNull(expenses.deletedAt)] as ReturnType<typeof sql>[];
+    if (dateFrom) expenseConds.push(sql`${expenses.date} >= ${dateFrom}::date`);
+    if (dateTo) expenseConds.push(sql`${expenses.date} <= ${dateTo}::date`);
+
     // Fetch orders joined with customer name + aggregated item totals
-    const rows = await db
+    const [rows, [{ expensesTotal }]] = await Promise.all([
+      db
       .select({
         id:               orders.id,
         orderId:          orders.orderId,
@@ -89,11 +98,7 @@ export async function GET(req: NextRequest) {
         deletedAt:          orders.deletedAt,
         // Joined/computed
         customerName:       customers.name,
-        totalPrice: sql<number>`COALESCE((
-          SELECT SUM(COALESCE(oi.price, 0) * COALESCE(oi.product_qty, 0))
-          FROM order_items oi
-          WHERE oi.order_id = ${orders.id} AND oi.deleted_at IS NULL
-        ), 0)`,
+        totalPrice:         itemsSubtotalSql,
         totalQty: sql<number>`COALESCE((
           SELECT SUM(COALESCE(oi.product_qty, 0))
           FROM order_items oi
@@ -115,7 +120,12 @@ export async function GET(req: NextRequest) {
       .from(orders)
       .leftJoin(customers, eq(orders.customerId, customers.id))
       .where(where)
-      .orderBy(desc(orders.orderDate), desc(orders.createdAt));
+      .orderBy(desc(orders.orderDate), desc(orders.createdAt)),
+      db
+        .select({ expensesTotal: sql<number>`COALESCE(SUM(${expenses.amount}), 0)` })
+        .from(expenses)
+        .where(and(...expenseConds)),
+    ]);
 
     const data: DashboardOrder[] = rows.map((r) => ({
       ...r,
@@ -128,7 +138,10 @@ export async function GET(req: NextRequest) {
       synced:          null,
     }));
 
-    return NextResponse.json({ data });
+    // Staff keep the order records they work with; the period's expense total is a
+    // money summary for managers and the owner (AUDIT.md F-12).
+    const meta = roleAtLeast(session, FINANCIAL_SUMMARY_ROLE) ? { expensesTotal: Number(expensesTotal ?? 0) } : {};
+    return NextResponse.json({ data, meta });
   } catch (err) {
     console.error("[GET /api/dashboard/orders]", err);
     const message = err instanceof Error ? err.message : String(err);

@@ -8,6 +8,7 @@ import { compare } from "bcryptjs";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { createAttemptLimiter } from "@/lib/attempt-limiter";
+import { hasRole, type Role } from "@/lib/roles";
 import { z } from "zod";
 
 const credentialsSchema = z.object({
@@ -35,7 +36,7 @@ class TooManyAttempts extends CredentialsSignin {
 // X-Forwarded-For, and Next.js only sets the header when it's absent, so the
 // last entry is the one a client can't forge through the proxy. A client that
 // reaches the app port directly can forge it (AUDIT.md F-31).
-function clientIp(request: Request): string {
+export function clientIp(request: Request): string {
   const forwarded = request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim();
   return forwarded || request.headers.get("x-real-ip") || "unknown";
 }
@@ -134,19 +135,15 @@ export async function requireSession() {
   return session;
 }
 
-export type Role = "owner" | "manager" | "staff";
-
-// Roles are hierarchical: owner outranks manager outranks staff.
-const ROLE_RANK: Record<Role, number> = { staff: 1, manager: 2, owner: 3 };
+export type { Role };
 
 /**
  * True when the session's role is at least `min` in the owner > manager > staff
- * hierarchy. Use in route handlers to authorise writes — every server action
- * and route handler must authorise the caller itself (AUDIT.md F-04).
+ * hierarchy (src/lib/roles.ts). Use in route handlers to authorise the caller —
+ * every server action and route handler must do so itself (AUDIT.md F-04, F-12).
  */
 export function roleAtLeast(session: Session | null, min: Role): boolean {
-  const role = (session?.user as { role?: string } | undefined)?.role;
-  return !!role && (ROLE_RANK[role as Role] ?? 0) >= ROLE_RANK[min];
+  return hasRole((session?.user as { role?: string } | undefined)?.role, min);
 }
 
 /** Standard 403 for a caller who is authenticated but lacks the required role. */

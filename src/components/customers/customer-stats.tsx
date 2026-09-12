@@ -1,14 +1,15 @@
 import { GlassCard } from "@/components/ui/glass-card";
-import { formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import type { Customer } from "@/types";
 
 interface CustomerStatsProps {
   customer: Customer;
   orderCount: number;
   totalSpent: number;
+  currencySymbol: string;
 }
 
-export function CustomerStats({ customer, orderCount, totalSpent }: CustomerStatsProps) {
+export function CustomerStats({ customer, orderCount, totalSpent, currencySymbol }: CustomerStatsProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-3">
       <GlassCard padding="sm">
@@ -17,7 +18,7 @@ export function CustomerStats({ customer, orderCount, totalSpent }: CustomerStat
       </GlassCard>
       <GlassCard padding="sm">
         <p className="text-xs text-t3">Total Spent</p>
-        <p className="mt-1 text-xl font-bold text-t1">${totalSpent.toFixed(2)}</p>
+        <p className="mt-1 text-xl font-bold text-t1">{formatCurrency(totalSpent, currencySymbol)}</p>
       </GlassCard>
       <GlassCard padding="sm">
         <p className="text-xs text-t3">Member Since</p>

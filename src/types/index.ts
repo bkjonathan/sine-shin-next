@@ -93,6 +93,8 @@ export type OrderWithCustomer = Order & {
 export type OrderListItem = Pick<Order, "id" | "orderId" | "customerId" | "status" | "shippingFee" | "deliveryFee" | "cargoFee" | "serviceFee" | "exchangeRate" | "createdAt" | "deletedAt"> & {
   customerName: string | null;
   customerDisplayId: string | null;
+  /** What the customer is charged: items + all fees (src/lib/order-money.ts). */
+  orderTotal: number;
   totalQty: number;
   totalWeight: number;
 };

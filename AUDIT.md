@@ -34,7 +34,7 @@ There is also no rate limiting, no transactions, no idempotency, no security hea
 
 ## 1a. Post-audit status (working-tree fixes)
 
-_Added 2026-09-11, after remediation began. The changes below live in the working tree and are **not committed**._
+_Added 2026-09-11, after remediation began. F-01 to F-08 were committed by the owner in `6fcf5c8`. Everything after that — the quick hardening batch, the F-09 report, F-10, F-11, F-12 and F-14 — is in the working tree and **not committed**. The per-finding "(WT)" / "not committed" labels were written before that commit._
 
 - **F-01 — fixed in working tree.** Upgraded `next` and `eslint-config-next` 16.2.1 → **16.2.12**, which clears all four middleware/proxy-bypass advisories. Verified by `next build`, `tsc --noEmit`, and a version + runtime guard (`tests/f01-next-version.test.mjs`). Caveat: a live bypass could **not** be reproduced on this app at 16.2.1 — middleware redirected every `.rsc`/segment variant tried. **Residual:** `next` still wants **16.3.3+** for the AVIF image-optimiser and Windows-host RCE advisories (both believed unreachable here — no `next/image`, Linux host); tracked as a separate follow-up.
 - **F-02 — fixed in working tree; severity corrected.** Added a `requireSession()` gate to the three detail pages (`tests/f02-page-auth.test.mjs`). **Corrected severity: HIGH → LOW–MEDIUM (defense-in-depth).** The original HIGH over-stated it: alongside middleware, the `(dashboard)` layout's own `auth()` already redirects direct/anonymous requests (verified), so this was never a live anonymous-read hole — the real residual was only the partial-rendering / lost-coverage case. The section-1 summary and the section-2 counts still reflect the **original** assessment; this note supersedes the F-02 severity.
@@ -71,7 +71,152 @@ _Added 2026-09-11, after remediation began. The changes below live in the workin
   - **The seed was also broken.** It imported `dotenv/config`, which isn't a dependency, so `npm run db:seed` failed with `Cannot find module`. The import is removed; pass `DATABASE_URL` in the environment, as the script's own usage line says. (Adding `dotenv` back would be a new dependency.)
   - **Verified** by `tests/f08-seed-owner-password.test.mjs`: it runs the real seed against the throwaway database, signs in with the generated and the provided password, confirms the old default is refused, and checks that no tracked file other than this report still contains it. Before the fix the seed couldn't load and the default was still tracked. Full suite F-01–F-08: 88 tests pass.
   - **Still needs the owner:** confirm the production `admin` account doesn't use the old default — it stays in git history, so treat it as public. No `mustChangePassword` flag yet (decision pending). A generated password that was printed to a terminal or CI log should be changed after first sign-in.
-- **New finding F-33 (found while verifying F-06).** A database built only from drizzle/0000–0009 lacks at least four columns the code uses: `expenses.expense_id`, `expenses.title`, `expenses.expense_date` and `cargo_items.note`. On such a database the expenses API, the trash and the public `/t/[code]` page return 500 (`errorMissingColumn`). Existing databases presumably gained these columns through `db:push` — step 2 of the tracked setup doc (memory/project_shop_manager.md:33) is `npm run db:push`. Consequences: rebuilding from migrations (disaster recovery, a new environment) yields a broken app, and production's `drizzle.__drizzle_migrations` may not reflect its real schema — so check both before running `db:migrate` there (F-20). **Not fixed:** needs a read-only look at the production schema first.
+- **Quick hardening batch — F-16, F-17, F-19, F-21, F-31 fixed in working tree.** Verified on a local build backed by the throwaway database. Each new test failed before its fix, except F-21's Docker probe, which was deliberately not run on the pre-fix tree because it would have copied the real `.env` into the local build cache. Full suite F-01–F-31: 104 tests pass.
+  - **F-16.** `safeRedirectPath()` (src/lib/utils.ts) keeps `callbackUrl` only if it is a relative path that resolves to the same origin. It uses the browser's own URL parser, so `//host`, `/\host` and tab/newline tricks fall back to `/dashboard`. The login page redirects only through it.
+  - **F-17.** next.config.ts sends `Strict-Transport-Security: max-age=31536000`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` and `X-Frame-Options: DENY` on every route, proxy redirects included, and sets `poweredByHeader: false`. HSTS omits `includeSubDomains` because other apps may share the domain (§6 item 10); browsers ignore HSTS over plain HTTP, so local development is unaffected. **Residual:** no Content-Security-Policy yet — it needs hashes or nonces for the two inline scripts in app/layout.tsx and for the print-label popup (F-05).
+  - **F-19.** ID prefixes must be 1–20 letters or digits after trimming, uppercasing and stripping trailing dashes (src/validations/settings.schema.ts); the settings form uses the same schema. With F-04's owner-only settings, the prefix part of F-19 is done. **Residual:** numbering still uses `split_part` + `max` (F-13), and customer numbering still scans every customer regardless of prefix. An existing prefix that doesn't fit must be changed before the settings form will save again.
+  - **F-21.** `.dockerignore` excludes `.env*`, `node_modules`, `.next`, `.git`, `memory`, `.claude`, `tests` and this report. Checked by asking Docker what it would send (a bind-mounted listing; no image is created): secrets and local artefacts are absent, and everything the Dockerfile needs is present. Excluding `node_modules` also stops the local macOS modules from overwriting the Linux ones installed by `npm ci`. **Not done:** the full image was not built (that needs a network `npm ci`). If an image built with `.env` was ever pushed to a registry, rotate those secrets.
+  - **F-31.** docker-compose.yml publishes `127.0.0.1:3000:3000`, so the port isn't reachable from other hosts. Checked with `docker compose config`, run so that it doesn't read `.env`. **Still unknown:** whether Coolify uses this file or its own port settings (§6 item 4).
+- **F-09 — not fixed; read-only groundwork added.** Deliberately deferred: it is the largest change in this report, it rewrites real financial rows, and it depends on F-10's formula definitions and F-11's base currency (both since settled — see below).
+  - **Precision report.** `scripts/f09-money-precision-report.mjs` covers all 18 `double precision` columns (9 money amounts, 7 rates, 2 weights). For each it reports: NaN/±Infinity, which a `numeric` column can't hold; negatives; the largest value and the integer digits it needs; the most decimals used; how many values rounding to the proposed scale would change, and by how much at most; and the column total as stored vs after rounding. It also counts orders by `service_fee_type`, for F-10. The session is set read-only, all queries run in a `READ ONLY` transaction, and only aggregates are printed.
+  - **Verified** by `tests/f09-precision-report.test.mjs` against the throwaway database. Seeded values — 10.005, 0.1 + 0.2, NaN, Infinity, a negative, a 12-digit amount and 1/3 — are each reported correctly, inside a transaction that is rolled back. A write through the script's connection is refused, and the command-line run doesn't print the database password.
+  - **Next:** run it against production with `DATABASE_URL=… node scripts/f09-money-precision-report.mjs`. F-10's definitions and F-11's base currency (THB) are settled. Then choose between `numeric` and integer minor units, and pick precision and a rounding rule.
+- **F-10 — fixed in working tree; definitions agreed with the owner on 2026-09-11** (answers §6 item 6).
+  - **Definitions** (src/lib/order-money.ts):
+    - _Items subtotal_ = Σ price × quantity over non-deleted items. No quantity counts as 1; no price counts as 0.
+    - _Service fee_ = that percentage of the items subtotal for "percent"/"%"; otherwise the amount itself.
+    - _Order total_ = items + shipping + delivery + cargo + service fee. Every fee is charged, including fees ticked "Shop" and a cargo fee ticked "Excluded". _Revenue_ = Σ order totals.
+    - _Shop income_ = service fee + purchase discount + each fee ticked "Shop".
+    - _Profit_ = shop income − expenses dated in the same period.
+    - "Excluded" only removes a cargo fee from the cargo statistics.
+  - **One implementation.** src/lib/order-money.ts (TypeScript) and src/lib/order-money-sql.ts (SQL fragments) now hold the only formulas. They replace 11 copies across the reports, dashboard, dashboard-orders, account and order-list APIs, the Dashboard and Account calculations, the order page, the order table, the orders CSV and grid, the customer page, and the invoice and receipt totals.
+  - **What the owner will see change:**
+    - Revenue includes the value of items. It was fees only, with percentage service fees added as if they were money.
+    - Dashboard "Net profit" subtracts the period's expenses; it subtracted none before. Reports profit and `/api/dashboard` profit now use expenses from the same period only (`/api/dashboard` used all-time expenses).
+    - The order page Total no longer subtracts "Shop" fees, and its Profit includes them.
+    - A cargo fee ticked both "Shop" and "Excluded" now counts as shop income.
+    - Customer "total spent", the order list, the CSV export and the print label show the full order total.
+    - An item with no quantity counts as 1 everywhere, including the quantity printed on invoices (invoice amounts already did this).
+  - **Verified** by `tests/f10-order-money.test.mjs`:
+    - worked examples of each definition
+    - a guard that fails if any of the old formulas reappears
+    - SQL and TypeScript agree order by order on a fixture in the throwaway database
+    - live checks of reports, the dashboard, `/api/dashboard`, the order list, account and the customer page against hand-checked totals: revenue 1,651, shop income 230, expenses in range 75.5, profit 154.5
+
+    Before the fix, the live check saw reports revenue of 160 and an items subtotal of 800 (the item with no quantity counted as 0). Full suite: 117 tests pass.
+  - **Residual:**
+    - Amounts are still floating point (F-09).
+    - Cargo-shipment money (carrier and receiver owed) is a separate calculation and is unchanged.
+    - Reports filter orders by `order_date` only but group months by `coalesce(order_date, created_at)`.
+    - The create-order form's live preview still treats an empty quantity as 0 while typing.
+    - Nothing was checked in a browser.
+- **F-11 — fixed in working tree; migration 0010 must run first; decisions agreed with the owner on 2026-09-12.**
+  - **Decisions:**
+    - base currency THB (฿), exchange currency MMK (Ks)
+    - receiver payments in THB or MMK; carrier payments in THB only, because balances count them at face value
+    - the base currency code is locked once any order, expense, cargo shipment, cargo payment, cargo expense or cargo category exists (soft-deleted rows count, since they can be restored)
+    - the default exchange rate is shop-wide and set by the owner
+  - **Settings on the server.** drizzle/0010_shop_currency.sql adds five columns to `shop_settings`:
+    - `currency_code`, `currency_symbol`, `exchange_currency_code`, `exchange_currency_symbol` (defaults THB, ฿, MMK, Ks)
+    - `default_exchange_rate`, a `numeric(18,6)` (not a float) with default 1
+
+    The statements use `ADD COLUMN IF NOT EXISTS`, and the journal `when` is later than 0009's. src/lib/currency.ts maps a settings row to the currency prefs the pages use, falling back to those defaults.
+  - **Calculations.** The cargo page computes balances from the shop row it renders on the server (`shopCurrency(shop)`), not from a client hook. `useCurrencyPrefs()` now reads `/api/settings`, so every browser shows the same symbols and pre-fills the same rate; nothing currency-related is kept in localStorage. The new-shipment form now applies the default rate once settings load; before, it captured 1 before the browser prefs had loaded.
+  - **Enforcement.**
+    - `POST /api/cargo-payments/:id` trims and uppercases the currency, then returns 400 unless it is the base currency (or, for a receiver, the exchange currency). The payment form offers only those choices.
+    - `PATCH /api/settings` (owner only) requires 3-letter codes, 1–10 character symbols and a positive rate below 10¹². It returns 400 if the base and exchange codes match, and 409 if the base code changes while money is recorded.
+    - On the Settings page the currency fields are now part of the shop-settings form, with one Save button.
+  - **"Base currency only" rule.** This answers the finding's "most amounts have no currency" part. Every amount column is in `currency_code`, as documented in the migration and src/db/schema/shop-settings.ts. It is enforced because cargo payments are the only place a currency can be entered, and the lock stops stored amounts being relabelled. No currency column was added to other tables.
+  - **Verified** by `tests/f11-shop-currency.test.mjs`:
+    - unit tests of the helpers
+    - a guard against currency in localStorage and hard-coded payment currencies
+    - live checks of the settings API: defaults, validation, owner-only access, and the lock both before and after money exists
+    - live checks of the payments API and of the server-rendered cargo page
+
+    Fixture: a receiver owes 500 THB and paid 20,000 MMK at 100 plus 300 THB. Before the fix, all 8 checks failed. The page showed "Receiver Owed $ 500 · Balance $ 297" with a "Paid $ 203 of $ 500" badge, and a carrier payment in USD was accepted (201). After the fix the balance is 0, the badge says paid in full, and USD is refused. Full suite, run with `--test-concurrency=1` (F-11 changes shared settings): 125 tests pass. `tsc --noEmit` is clean and `next build` passes.
+  - **Deploy order matters.** Apply 0010 to production _before_ the new image goes live. The dashboard layout selects every `shop_settings` column, so until the columns exist every dashboard page fails. Old code doesn't read them, so running 0010 early is safe; run its statements by hand (F-06 note, F-33). Then the owner should open Settings and set **Default Exchange Rate**: it starts at 1, and rates saved in individual browsers are no longer read.
+  - **What the owner will see change:**
+    - Every browser shows ฿ and the owner's default rate.
+    - A receiver payment recorded in THB counts at face value for everyone.
+    - The payment form offers MMK/THB for receivers and fixes carriers to THB.
+    - Settings has one Save button.
+  - **Residual:**
+    - Existing payment rows are not rewritten. Carrier payments stored as "USD" (the old form default) were always counted at face value, but their receipts still print "USD". A receiver payment with a code other than THB/MMK is still converted at its rate, as before. Check production read-only: `select party_type, currency, count(*) from cargo_payments group by 1, 2`.
+    - The exchange currency code is not locked. Changing it relabels the "total with exchange" on existing invoices without converting it.
+    - The lock check and the update are not one transaction (F-13).
+    - The Settings form is still shown to every role; non-owners get 403 when saving (F-04 residual).
+    - Amounts are still floating point (F-09). The default rate is stored as numeric but read as a JS number.
+    - Only the dashboard, Expenses, Reports, Account Book and customer pages were checked in a browser (during F-12, below). The cargo payment form and the Settings currency fields were not.
+  - **Follow-up, found while checking F-12 in a browser.** The claim above that every browser shows ฿ was not true at first. Five displays never read the currency setting; they used a fixed "$": the dashboard's Net profit and Revenue chips (`formatCurrency()` defaults to "$"), order totals on the customer page, the customer's "Total Spent" card, and deleted-expense amounts in Settings → Trash. All five now use the shop's symbol; the customer page reads it on the server. `tests/f11-shop-currency.test.mjs` now also fails on a `formatCurrency()` call without a symbol or a literal "$" before an amount; it flags all four affected files as they were at HEAD. F-10's customer-page check matched the old "$1546.00" format and now checks the amount only.
+- **F-12 — fixed in working tree; policy agreed with the owner on 2026-09-12** (answers the read half of §6 item 2).
+  - **Policy.** Shop-wide money summaries are for managers and the owner: revenue, shop income, profit, expense totals, and cargo carrier-cost and receiver-revenue totals. The rule is one constant, `FINANCIAL_SUMMARY_ROLE` in src/lib/roles.ts. Only summaries are restricted for now: staff keep the individual records they work with — orders (including buy price and per-order profit), expenses, and cargo rates, amounts owed and per-shipment profit.
+  - **Server.**
+    - `/api/reports` (same rule as before, now from the shared constant), `/api/dashboard` and `/api/account` return 403 to staff.
+    - For staff, three shared endpoints drop only their totals and keep their records: `/api/dashboard/orders` omits `meta.expensesTotal`, `/api/dashboard/cargo` omits `stats.carrier_owed` and `receiver_owed`, and `/api/expenses` omits `meta.stats`.
+    - The role hierarchy moved to `hasRole()` in src/lib/roles.ts, so route handlers (through `roleAtLeast`) and client components share it. It also rejects inherited property names such as `toString`.
+  - **UI (what gets rendered; the APIs are the access control).**
+    - The sidebar shows Reports to managers and the owner (it was owner only) and Users to the owner.
+    - For staff, the dashboard hides Net profit, Revenue, the Financial Overview cards, the cargo cost/revenue/profit cards and the Account Book button. The Expenses page hides the total, this-month and average cards.
+    - Reports and the Account Book show "Not available for your role" to staff, without calling their APIs.
+  - **Verified** by `tests/f12-financial-summaries.test.mjs`:
+    - unit tests of the role hierarchy
+    - for each role, the three summary-only endpoints (403 for staff, 200 otherwise)
+    - the three shared endpoints (records for everyone, totals for managers and the owner only)
+    - the server-rendered dashboard, Reports, Account Book and Expenses pages
+
+    Before the fix, all 5 failed: `/api/dashboard` returned 200 to staff, dashboard orders sent staff the expense total, and the dashboard showed staff the money cards. Full suite (`--test-concurrency=1`): 130 tests pass. `tsc --noEmit` is clean and `next build` passes.
+  - **What the owner will see change:**
+    - Managers now see Reports in the sidebar.
+    - Staff no longer see money cards on the dashboard or the Expenses page, and can't open Reports or the Account Book.
+  - **Residual:**
+    - **Not a hard barrier.** Staff can still add up the order, expense and cargo records they are allowed to list, and they still see buy prices, carrier rates and per-order or per-shipment profit. Hiding margins from staff would change the agreed write permissions, since staff enter those values. Not done, by decision.
+    - A customer's "Total spent" is per customer and stays visible to staff.
+    - The sidebar and page gates read the session loaded with the page. A demoted manager keeps seeing the links until the next full page load, but the APIs refuse them on the next request (F-06).
+    - `useDashboardStats()` in src/hooks/use-settings.ts, the only caller of `/api/dashboard`, is unused.
+  - **Checked in a browser.** Headless Chrome (Playwright) ran against a local `next build && next start` on the throwaway database, with a small fixture that was removed afterwards. It loaded the dashboard, Expenses, Reports, Account Book and a customer page as staff, manager and owner:
+    - no failed API call, console error or error toast for any role
+    - staff saw no money cards or totals, no Reports link, and "Not available for your role" on Reports and the Account Book
+    - managers and the owner saw every summary, matching the fixture (revenue ฿1,150, profit ฿55, carrier cost ฿300, receiver revenue ฿500)
+    - only the owner saw the Users link
+
+    This check also found the hard-coded "$" displays recorded under F-11's follow-up.
+- **F-14 — fixed in working tree; migration 0011 must run first; decisions agreed with the owner on 2026-09-12.**
+  - **Decisions.** Record every change to shop data, permanently, and never store password hashes. An owner-only Settings → Activity page shows the log.
+  - **How changes are recorded.** drizzle/0011_audit_log.sql adds an `audit_log` table and a trigger on all 11 business tables.
+    - Each `audit_log` row holds the time, user id, role, client IP, database user, action, table, row id, and the whole row `before` and `after` as JSON.
+    - The trigger (`AFTER INSERT OR UPDATE OR DELETE`) runs inside the same transaction as the change: a change can't be saved without its row, and a rolled-back change leaves none.
+    - Password hashes are stripped; a password change shows as `password_changed: true`. An update that changed nothing isn't recorded.
+  - **Who made the change.** Every route handler write now runs inside `withAudit(req, session, tx => …)` (src/lib/audit.ts). It opens a transaction and sets `app.user_id`, `app.user_role` and `app.client_ip` for it; the address comes from F-07's `clientIp()`. All 22 route files that write were converted, and the test fails if any route writes with `db` directly. A change made outside the app (psql, a script, a migration) is still recorded, with the database user and no app user.
+  - **Append-only.** Triggers on `audit_log` refuse UPDATE, DELETE and TRUNCATE.
+  - **Side effects of the transactions.** Creating an order or a shipment together with its items is now all-or-nothing. `PATCH /api/orders/:id` now sets `updated_at`. Display-number races and idempotency (F-13) are unchanged.
+  - **Viewer.**
+    - `GET /api/audit-log` (owner only): newest first, 50 per page, filterable by table and record id.
+    - Settings → Activity (owner only): labels each entry Created, Changed, Moved to trash, Restored or Deleted permanently, and lists changed fields as old → new.
+  - **Verified** by `tests/f14-audit-log.test.mjs`:
+    - unit tests of the entry formatting
+    - a guard that all 22 writing route files use `withAudit`
+    - live checks on the throwaway database:
+      - a recording trigger exists on all 11 tables
+      - a customer created by staff, edited, trashed and restored by a manager, then permanently deleted by the owner, with the right user, role and client address on each row
+      - an order and its item attributed to the same user, and `updated_at` set on edit
+      - a password reset leaves no hash anywhere in the log
+      - a write that fails on a foreign key leaves no row
+      - a direct SQL change is recorded without an app user
+      - UPDATE, DELETE and TRUNCATE on the log are refused
+      - the API and page are owner-only
+
+    Before the fix all 13 checks failed; after it all pass. Full suite (`--test-concurrency=1`): 143 tests pass. `tsc --noEmit` is clean and `next build` passes.
+
+    Also checked in headless Chrome: the owner's Activity tab listed a customer's creation, its phone and city change (old → new), and the move to trash, with who did each, their role and address. A manager had no Activity tab. Neither role saw a failed request or console error.
+  - **Deploy order.** Apply 0011 to production before or together with the new image. Without it, writes still work but nothing is recorded and the Activity page returns 500. Run its statements by hand (F-06 note, F-33): `db:push` would create the table but not the triggers. The trigger syntax needs Postgres 11 or later.
+  - **Residual:**
+    - The app's database role owns `audit_log`, so that role (or anyone with its password) could drop the append-only triggers. A hard guarantee needs the app to connect as a separate role without ownership or DDL rights; not done, because it needs access to the production database (§6 item 4).
+    - Rows are kept forever and include customer details, even after a customer is permanently deleted. Removing old rows needs a deliberate admin step (drop the guard trigger, delete, recreate it). There is no retention policy yet.
+    - A `TRUNCATE` of a business table isn't recorded, because row triggers don't fire for it.
+    - The client address can be forged if port 3000 is reachable without Traefik (F-31).
+    - Reads aren't logged, so there's no record of who viewed what.
+    - Tests seed data with direct SQL, so throwaway databases accumulate log rows that can't be removed.
+- **New finding F-33 (found while verifying F-06).** A database built only from drizzle/0000–0009 lacks at least four columns the code uses: `expenses.expense_id`, `expenses.title`, `expenses.expense_date` and `cargo_items.note`. (Found later, while verifying F-10: migration 0000 creates the last two expense columns under their old names, `description` and `date`, both NOT NULL. So on such a database, creating an expense also fails.) On such a database the expenses API, the trash and the public `/t/[code]` page return 500 (`errorMissingColumn`). Existing databases presumably gained these columns through `db:push` — step 2 of the tracked setup doc (memory/project_shop_manager.md:33) is `npm run db:push`. Consequences: rebuilding from migrations (disaster recovery, a new environment) yields a broken app, and production's `drizzle.__drizzle_migrations` may not reflect its real schema — so check both before running `db:migrate` there (F-20). **Not fixed:** needs a read-only look at the production schema first.
 
 ---
 
@@ -87,19 +232,19 @@ _Added 2026-09-11, after remediation began. The changes below live in the workin
 | F-06 | HIGH | C Session | src/lib/auth.ts:47-57 | ✓ fixed (WT; migration 0009 must run first — see §1a) — Sessions cannot be revoked; deleting, demoting or re-passwording a user doesn't end their sessions |
 | F-07 | HIGH | H Abuse | src/lib/auth.ts:21-44 | ✓ fixed (WT; see §1a) — No rate limiting or lockout on login; response timing reveals valid usernames |
 | F-08 | HIGH | I Secrets | src/db/seed.ts:51-58 | ✓ code fixed (WT); production password check still needed — see §1a — Seeded owner account `admin` / `admin123`, documented in a tracked file |
-| F-09 | HIGH | G Money | src/db/schema/orders.ts:11-16 | All monetary values stored as `double precision` and computed as JS floats |
-| F-10 | HIGH | G Money | src/app/api/dashboard/route.ts:73-74 | Revenue and profit have conflicting definitions; percentage service fee summed as money |
-| F-11 | HIGH | G Money | src/components/cargo/cargo-detail-client.tsx:188-192 | Cargo payment balances depend on a per-browser localStorage currency |
-| F-12 | MEDIUM | A/E Access control | src/app/api/dashboard/route.ts:28-30 | Financial data blocked in `/api/reports` is served to every role by other endpoints |
+| F-09 | HIGH | G Money | src/db/schema/orders.ts:11-16 | ✗ open — read-only precision report added; F-10/F-11 now settled (see §1a) — All monetary values stored as `double precision` and computed as JS floats |
+| F-10 | HIGH | G Money | src/app/api/dashboard/route.ts:73-74 | ✓ fixed (WT; definitions agreed with owner — see §1a) — Revenue and profit have conflicting definitions; percentage service fee summed as money |
+| F-11 | HIGH | G Money | src/components/cargo/cargo-detail-client.tsx:188-192 | ✓ fixed (WT; migration 0010 must run first; decisions agreed with owner — see §1a) — Cargo payment balances depend on a per-browser localStorage currency |
+| F-12 | MEDIUM | A/E Access control | src/app/api/dashboard/route.ts:28-30 | ✓ fixed (WT; summaries manager+, agreed with owner; records still visible to staff — see §1a) — Financial data blocked in `/api/reports` is served to every role by other endpoints |
 | F-13 | MEDIUM | G Correctness | src/app/api/orders/route.ts:96-126 | No transactions, racy display-number generation, no idempotency |
-| F-14 | MEDIUM | K Audit | src/db/schema/index.ts:1-11 | No audit trail for any money, status, delete or user change |
+| F-14 | MEDIUM | K Audit | src/db/schema/index.ts:1-11 | ✓ fixed (WT; migration 0011 must run first; owner-only Activity page — see §1a) — No audit trail for any money, status, delete or user change |
 | F-15 | MEDIUM | F Validation | src/validations/order.schema.ts:10-40 | Amounts, rates, percentages and quantities have no upper bounds; dates unvalidated |
-| F-16 | MEDIUM | C Auth | src/app/(auth)/login/page.tsx:22,44 | Open redirect after login via `callbackUrl` |
-| F-17 | MEDIUM | J Headers | next.config.ts:5-14 | No CSP, HSTS, frame, nosniff or referrer headers; `X-Powered-By` enabled |
+| F-16 | MEDIUM | C Auth | src/app/(auth)/login/page.tsx:22,44 | ✓ fixed (WT; see §1a) — Open redirect after login via `callbackUrl` |
+| F-17 | MEDIUM | J Headers | next.config.ts:5-14 | ✓ fixed (WT; CSP still open — see §1a) — No CSP, HSTS, frame, nosniff or referrer headers; `X-Powered-By` enabled |
 | F-18 | MEDIUM | C Auth | src/app/api/users/[id]/route.ts:35-107 | ◐ password-minimum part done under F-07; re-authentication still open — Owner resets other users' passwords/roles with no re-authentication; 6-char passwords allowed |
-| F-19 | MEDIUM | F/G Correctness | src/validations/settings.schema.ts:8-10 | Any role can set an ID prefix that breaks order/customer/shipment creation |
+| F-19 | MEDIUM | F/G Correctness | src/validations/settings.schema.ts:8-10 | ✓ fixed (WT; numbering itself is F-13 — see §1a) — Any role can set an ID prefix that breaks order/customer/shipment creation |
 | F-20 | MEDIUM | N Migrations | drizzle/meta/_journal.json | Journal timestamps out of order; Drizzle silently skips older migrations |
-| F-21 | MEDIUM | I Secrets | Dockerfile:15,36 | No `.dockerignore`; `.env` can be baked into the runtime image |
+| F-21 | MEDIUM | I Secrets | Dockerfile:15,36 | ✓ fixed (WT; see §1a) — No `.dockerignore`; `.env` can be baked into the runtime image |
 | F-22 | LOW | K Logging | src/app/api/dashboard/route.ts:150-159 | 500 responses return SQL text and params; failed user writes log bcrypt hashes |
 | F-23 | LOW | E Exposure | src/app/t/[code]/page.tsx:77-111 | Public tracking page stays open for cancelled shipments; full shop row sent to anonymous users |
 | F-24 | LOW | F Validation | src/app/api/cargo-items/[cargoShipmentId]/route.ts:117-134 | DELETE/bag handlers parse body outside try, don't type-check ids, touch deleted rows |
@@ -109,7 +254,7 @@ _Added 2026-09-11, after remediation began. The changes below live in the workin
 | F-28 | LOW | J Export | src/app/(dashboard)/orders/page.tsx:70-80 | CSV export doesn't escape quotes or neutralise spreadsheet formulas |
 | F-29 | LOW | I Config | src/env.ts:1-19 | Environment validation module is never imported |
 | F-30 | LOW | E Public code | drizzle/0007_cargo_item_public_code.sql:10-12 | Backfilled tracking codes generated with `md5(random())` |
-| F-31 | LOW | I Deploy | docker-compose.yml:6-7,12 | Compose publishes port 3000 on all interfaces with `AUTH_TRUST_HOST=true` |
+| F-31 | LOW | I Deploy | docker-compose.yml:6-7,12 | ✓ fixed (WT; see §1a) — Compose publishes port 3000 on all interfaces with `AUTH_TRUST_HOST=true` |
 | F-32 | LOW | M Deps | package.json:33,38,41,43 | Advisories in axios, drizzle-orm, nanoid, @auth/core — not reachable, but should be patched |
 | F-33 | MEDIUM | N Migrations | drizzle/*.sql vs src/db/schema/expenses.ts, cargo-items.ts | Added after the audit (see §1a) — migrations never create `expenses.expense_id`/`title`/`expense_date` or `cargo_items.note`; a database built from migrations breaks expenses, trash and public tracking |
 
@@ -314,6 +459,8 @@ Also compare against a dummy bcrypt hash when the user is not found, so timing i
 
 #### F-09 — Money stored and computed as floating point
 
+> **Status: not fixed.** A read-only precision report (scripts/f09-money-precision-report.mjs) is ready to run against production. F-10's definitions and F-11's base currency, which the migration waited on, are now settled. See §1a.
+
 **Area:** G Money
 **Where — schema:**
 
@@ -341,6 +488,8 @@ Read `numeric` values as strings in Drizzle, and do arithmetic in integer minor 
 **Effort:** Large
 
 #### F-10 — Revenue and profit have conflicting definitions; percentage service fee counted as money
+
+> **Status: fixed in working tree (not committed).** The definitions agreed with the owner are implemented once, in src/lib/order-money.ts and src/lib/order-money-sql.ts. See §1a for the definitions and the visible changes.
 
 **Area:** G Money
 
@@ -374,6 +523,8 @@ Read `numeric` values as strings in Drizzle, and do arithmetic in integer minor 
 
 #### F-11 — Cargo payment balances depend on each browser's currency setting; most amounts have no currency
 
+> **Status: fixed in working tree (not committed); migration 0010 must run first.** Currency settings live in `shop_settings` (THB base, MMK exchange), balances use the server's value, and the payments and settings APIs enforce the agreed rules. See §1a.
+
 **Area:** G Money
 **Where:**
 
@@ -390,6 +541,8 @@ Read `numeric` values as strings in Drizzle, and do arithmetic in integer minor 
 ### MEDIUM
 
 #### F-12 — Financial data restricted in reports is served to every role elsewhere
+
+> **Status: fixed in working tree (not committed).** Money summaries are for managers and the owner, enforced by the route handlers and mirrored in the sidebar and pages. By the owner's decision, the individual records stay visible to staff, so this isn't a hard barrier. See §1a.
 
 **Area:** A Access control, E Data exposure
 **Where:**
@@ -438,6 +591,8 @@ Read `numeric` values as strings in Drizzle, and do arithmetic in integer minor 
 
 #### F-14 — No audit trail
 
+> **Status: fixed in working tree (not committed); migration 0011 must run first.** Database triggers record every change, with who made it and the values before and after, in an append-only `audit_log`, inside the same transaction as the change. The owner reads it in Settings → Activity. See §1a.
+
 **Area:** K Logging and audit
 **Where:** the whole codebase; there is no audit table in src/db/schema/index.ts:1-11.
 
@@ -475,6 +630,8 @@ Read `numeric` values as strings in Drizzle, and do arithmetic in integer minor 
 
 #### F-16 — Open redirect after login
 
+> **Status: fixed in working tree (not committed).** The login page redirects only through `safeRedirectPath()`. See §1a.
+
 **Area:** C Authentication
 **Where:** src/app/(auth)/login/page.tsx:22, 44.
 
@@ -484,6 +641,8 @@ Read `numeric` values as strings in Drizzle, and do arithmetic in integer minor 
 **Effort:** Small
 
 #### F-17 — No security response headers
+
+> **Status: fixed in working tree (not committed), except CSP.** HSTS, nosniff, Referrer-Policy and X-Frame-Options on every route; X-Powered-By off. See §1a.
 
 **Area:** J Headers
 **Where:** next.config.ts:5-14 sets headers only for `/sw.js`, and `poweredByHeader` is left at its default (enabled).
@@ -511,6 +670,8 @@ Set `poweredByHeader: false`. Add a CSP afterwards; the two inline scripts in sr
 **Effort:** Small
 
 #### F-19 — Any role can break record creation through ID prefixes
+
+> **Status: fixed in working tree (not committed).** Prefixes are letters and digits only, and settings are owner-only (F-04). Sequence-based numbering remains under F-13. See §1a.
 
 **Area:** F Validation, G Correctness
 **Where:**
@@ -554,6 +715,8 @@ Later entries use hand-picked midnight timestamps. Consequences:
 **Effort:** Small
 
 #### F-21 — Docker build can bake `.env` into the image
+
+> **Status: fixed in working tree (not committed).** `.dockerignore` keeps secrets and local artefacts out of the build context. See §1a.
 
 **Area:** I Secrets and configuration
 **Where:** Dockerfile:15 (`COPY . .`) and :36 (copies `.next/standalone` into the runner); no `.dockerignore`. A local build shows `.next/standalone/.env` exists.
@@ -695,6 +858,8 @@ Every value is a bound parameter, so none of this is SQL injection.
 **Effort:** Small
 
 #### F-31 — docker-compose exposes the app port directly
+
+> **Status: fixed in working tree (not committed).** The compose port is bound to 127.0.0.1. See §1a.
 
 **Area:** I Deployment
 **Where:** docker-compose.yml:6-7, 12.

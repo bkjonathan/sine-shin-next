@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
 import { cargoCategories } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { updateCargoCategorySchema } from "@/validations/cargo.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function PATCH(
   req: NextRequest,
@@ -21,10 +21,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [updated] = await db.update(cargoCategories)
+    const [updated] = await withAudit(req, session, (tx) => tx.update(cargoCategories)
       .set({ ...parsed.data })
       .where(and(eq(cargoCategories.id, id), isNull(cargoCategories.deletedAt)))
-      .returning();
+      .returning());
 
     if (!updated) return NextResponse.json({ error: "Category not found" }, { status: 404 });
 
@@ -36,7 +36,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -44,10 +44,10 @@ export async function DELETE(
   if (!roleAtLeast(session, "owner")) return forbidden();
 
   const { id } = await params;
-  const [deleted] = await db.update(cargoCategories)
+  const [deleted] = await withAudit(req, session, (tx) => tx.update(cargoCategories)
     .set({ deletedAt: new Date() })
     .where(and(eq(cargoCategories.id, id), isNull(cargoCategories.deletedAt)))
-    .returning();
+    .returning());
 
   if (!deleted) return NextResponse.json({ error: "Category not found" }, { status: 404 });
   return NextResponse.json({ data: { success: true } });

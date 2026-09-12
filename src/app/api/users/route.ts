@@ -6,6 +6,7 @@ import { nanoid } from "nanoid";
 import { hash } from "bcryptjs";
 import { createUserSchema } from "@/validations/user.schema";
 import { auth } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function GET(req: NextRequest) {
   const session = await auth();
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest) {
 
     const passwordHash = await hash(parsed.data.password, 12);
 
-    const [user] = await db
+    const [user] = await withAudit(req, session, (tx) => tx
       .insert(users)
       .values({
         id: nanoid(),
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
         username: users.username,
         role: users.role,
         createdAt: users.createdAt,
-      });
+      }));
 
     return NextResponse.json({ data: user }, { status: 201 });
   } catch (err) {

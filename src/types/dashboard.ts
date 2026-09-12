@@ -5,7 +5,7 @@ import type { Order, OrderItem, Expense, CargoShipmentListItem } from "@/types";
 
 export type DashboardOrder = Order & {
   customerName: string | null;
-  totalPrice: number | null;    // SUM(item.price * item.qty)
+  totalPrice: number | null;    // items subtotal: SUM(item.price * (item.qty ?? 1))
   totalQty: number | null;      // SUM(item.qty)
   totalWeight: number | null;   // SUM(item.weight)
   firstProductUrl: string | null;
@@ -28,8 +28,8 @@ export interface DashboardFilterParams {
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
 export interface DashboardStats {
-  total_revenue: number;        // sum of all order totalPrice
-  total_profit: number;         // sum of all calculateOrderProfit()
+  total_revenue: number;        // sum of order totals (items + all fees)
+  total_profit: number;         // shop income − the period's expenses (src/lib/order-money.ts)
   total_cargo_fee: number;      // sum of effective cargo fees
   paid_cargo_fee: number;       // cargo fees where cargoFeePaid === true
   unpaid_cargo_fee: number;     // cargo fees where cargoFeePaid !== true
@@ -49,8 +49,9 @@ export interface DashboardCargoStats {
   delivered: number;
   cancelled: number;
   total_weight: number;   // sum of item weight (kg)
-  carrier_owed: number;   // sum(weight * carrier rate) — what we owe carriers
-  receiver_owed: number;  // sum(weight * receiver rate) — what receivers owe us
+  // Money summaries, omitted for staff (AUDIT.md F-12).
+  carrier_owed?: number;   // sum(weight * carrier rate) — what we owe carriers
+  receiver_owed?: number;  // sum(weight * receiver rate) — what receivers owe us
 }
 
 export interface DashboardCargoData {

@@ -6,6 +6,7 @@ import { InvoicePrintLayout } from "@/components/invoice/InvoicePrintLayout";
 import { InvoiceDownloadTemplate } from "@/components/invoice/InvoiceDownloadTemplate";
 import { PaymentReceivedTemplate } from "@/components/invoice/PaymentReceivedTemplate";
 import { formatPrice } from "@/utils/invoiceCalculations";
+import { orderMoney, itemsSubtotal as sumItems } from "@/lib/order-money";
 import { downloadDataUrl } from "@/utils/downloadImage";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -330,8 +331,8 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
 
   // ── Financial calculations ──────────────────────────────────────────
   const items = initialItems; // items are managed by OrderItemsSection
-  const itemsSubtotal = items.reduce((s, i) => s + (i.price ?? 0) * (i.productQty ?? 0), 0);
-  const totalQty = items.reduce((s, i) => s + (i.productQty ?? 0), 0);
+  const itemsSubtotal = sumItems(items);
+  const totalQty = items.reduce((s, i) => s + (i.productQty ?? 1), 0);
   const totalWeight = items.reduce((s, i) => s + (i.productWeight ?? 0), 0);
   const discount = order.productDiscount ?? 0;
   // Buy price has no column of its own — it is derived from the discount we
@@ -343,20 +344,19 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
   const deliveryFee = order.deliveryFee;
   const cargoFee = order.cargoFee;
   const serviceFeeRate = order.serviceFee;
-  // Service fee % applies to itemsSubtotal (primary currency), not the exchange-converted amount
-  const isPercentFee = order.serviceFeeType === "%" || order.serviceFeeType === "percent";
-  const serviceFeeAmount = isPercentFee ? itemsSubtotal * (serviceFeeRate / 100) : serviceFeeRate;
-  const feesTotal = shippingFee + deliveryFee + cargoFee + serviceFeeAmount;
+  // Shop-wide definitions (src/lib/order-money.ts, AUDIT.md F-10): the customer is
+  // charged every fee; fees ticked "Shop" are the shop's income, not a deduction.
+  // A % service fee applies to the items subtotal, not the exchange-converted amount.
+  const { serviceFeeAmount, feesTotal, orderTotal, shopIncome } = orderMoney(order, itemsSubtotal);
 
-  const shopAbsorbedFees =
+  const shopEarnedFees =
     (order.shippingFeeByShop ? shippingFee : 0) +
     (order.deliveryFeeByShop ? deliveryFee : 0) +
     (order.cargoFeeByShop ? cargoFee : 0);
 
-  const customerFees = feesTotal - shopAbsorbedFees;
   // grandTotal stays in primary currency ($); exchange rate is applied only at display time
   // productDiscount is our internal profit, not a customer-facing deduction
-  const grandTotal = itemsSubtotal + customerFees;
+  const grandTotal = orderTotal;
   const grandTotalInExchangeCurrency = grandTotal * order.exchangeRate;
 
   // ── Status timeline ─────────────────────────────────────────────────
@@ -381,8 +381,8 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
   const statusOptions = ORDER_STATUSES.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) }));
   const sourceOptions = ORDER_FROM_OPTIONS.map((s) => ({ value: s, label: s }));
 
-  // ── Invoice values (all fees shown, no shop-absorbed deduction) ──────
-  const invoiceOrderTotal = itemsSubtotal + feesTotal;
+  // ── Invoice values (the same order total as this page) ───────────────
+  const invoiceOrderTotal = orderTotal;
   const invoiceTotalWithExchange = invoiceOrderTotal * order.exchangeRate;
 
   // ── Payment received amount (same total the invoice shows) ──────────
@@ -617,7 +617,7 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             <div className="min-w-0">
               <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-t4">Fees</p>
               <p className="text-lg font-bold text-t1">{formatCurrency(feesTotal, prefs.currencySymbol)}</p>
-              <p className="text-[10px] text-t4">{shopAbsorbedFees > 0 ? `${formatCurrency(shopAbsorbedFees, prefs.currencySymbol)} by shop` : "All charged"}</p>
+              <p className="text-[10px] text-t4">{shopEarnedFees > 0 ? `${formatCurrency(shopEarnedFees, prefs.currencySymbol)} earned by shop` : "All charged"}</p>
             </div>
           </div>
         </GlassCard>
@@ -771,12 +771,12 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-t3">Subtotal (items + fees)</span>
-                <span className="font-medium text-t1">{formatCurrency(itemsSubtotal + feesTotal, prefs.currencySymbol)}</span>
+                <span className="font-medium text-t1">{formatCurrency(orderTotal, prefs.currencySymbol)}</span>
               </div>
-              {shopAbsorbedFees > 0 && (
+              {shopEarnedFees > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-warning">Shop Absorbed Fees</span>
-                  <span className="font-medium text-warning">-{formatCurrency(shopAbsorbedFees, prefs.currencySymbol)}</span>
+                  <span className="text-t3">Of which fees earned by shop</span>
+                  <span className="font-medium text-t2">{formatCurrency(shopEarnedFees, prefs.currencySymbol)}</span>
                 </div>
               )}
             </div>
@@ -788,10 +788,10 @@ export function OrderDetailClient({ order: initialOrder, items: initialItems, cu
                   <span className="text-xl font-bold text-accent">{formatCurrency(grandTotal, prefs.currencySymbol)}</span>
                 </div>
               </div>
-              {(serviceFeeAmount > 0 || discount > 0) && (
+              {shopIncome !== 0 && (
                 <div className="flex items-center justify-between px-1">
                   <span className="text-sm font-semibold text-t2">Profit</span>
-                  <span className="text-lg font-bold text-success">{formatCurrency(serviceFeeAmount + discount, prefs.currencySymbol)}</span>
+                  <span className="text-lg font-bold text-success">{formatCurrency(shopIncome, prefs.currencySymbol)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between px-1">

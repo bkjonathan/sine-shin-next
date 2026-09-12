@@ -5,6 +5,7 @@ import { eq, ilike, and, ne, sql } from "drizzle-orm";
 import { hash } from "bcryptjs";
 import { updateUserSchema } from "@/validations/user.schema";
 import { auth } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function GET(
   _req: NextRequest,
@@ -96,7 +97,7 @@ export async function PATCH(
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
-    const [updated] = await db
+    const [updated] = await withAudit(req, session, (tx) => tx
       .update(users)
       .set(updateData)
       .where(eq(users.id, id))
@@ -105,7 +106,7 @@ export async function PATCH(
         username: users.username,
         role: users.role,
         createdAt: users.createdAt,
-      });
+      }));
 
     if (!updated) return NextResponse.json({ error: "User not found" }, { status: 404 });
     return NextResponse.json({ data: updated });
@@ -116,7 +117,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -132,7 +133,8 @@ export async function DELETE(
     return NextResponse.json({ error: "Cannot delete yourself" }, { status: 400 });
   }
 
-  const [deleted] = await db.delete(users).where(eq(users.id, id)).returning({ id: users.id });
+  const [deleted] = await withAudit(req, session, (tx) =>
+    tx.delete(users).where(eq(users.id, id)).returning({ id: users.id }));
 
   if (!deleted) return NextResponse.json({ error: "User not found" }, { status: 404 });
   return NextResponse.json({ data: { success: true } });

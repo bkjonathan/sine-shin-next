@@ -6,6 +6,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
+import { GlassSelect } from "@/components/ui/glass-select";
 import { CustomerCombobox } from "@/components/orders/customer-combobox";
 import { CargoPaymentReceiptButton } from "@/components/cargo/cargo-payment-receipt-button";
 import { useAddCargoPayment, useRemoveCargoPayment } from "@/hooks/use-cargo";
@@ -26,6 +27,7 @@ interface CargoPaymentsSectionProps {
   shipmentExchangeRate: number;
   baseCurrencySymbol: string;
   baseCurrencyCode: string;
+  exchangeCurrencyCode: string;
 }
 
 function todayISO() {
@@ -52,11 +54,15 @@ export function CargoPaymentsSection({
   shipmentExchangeRate,
   baseCurrencySymbol,
   baseCurrencyCode,
+  exchangeCurrencyCode,
 }: CargoPaymentsSectionProps) {
+  // The API accepts only these (AUDIT.md F-11): receivers pay in either
+  // currency, carriers in the base currency, which balances count at face value.
+  const defaultCurrency = partyType === "receiver" ? exchangeCurrencyCode : baseCurrencyCode;
   const [adding, setAdding] = useState(false);
   const [customerId, setCustomerId] = useState("");
   const [amount, setAmount] = useState(0);
-  const [currency, setCurrency] = useState(partyType === "receiver" ? "MMK" : "USD");
+  const [currency, setCurrency] = useState(defaultCurrency);
   const [exchangeRate, setExchangeRate] = useState(shipmentExchangeRate);
   const [paidAt, setPaidAt] = useState(todayISO());
   const [method, setMethod] = useState("");
@@ -68,7 +74,7 @@ export function CargoPaymentsSection({
   const balance = owed - paid;
 
   function resetForm() {
-    setCustomerId(""); setAmount(0); setCurrency(partyType === "receiver" ? "MMK" : "USD");
+    setCustomerId(""); setAmount(0); setCurrency(defaultCurrency);
     setExchangeRate(shipmentExchangeRate); setPaidAt(todayISO()); setMethod(""); setNote("");
     setAdding(false);
   }
@@ -190,7 +196,16 @@ export function CargoPaymentsSection({
           )}
           <div className="grid grid-cols-2 gap-3">
             <GlassInput label="Amount" type="number" min={0} step={0.01} value={amount} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} />
-            <GlassInput label="Currency" value={currency} onChange={(e) => setCurrency(e.target.value.toUpperCase())} />
+            {partyType === "receiver" ? (
+              <GlassSelect
+                label="Currency"
+                options={[exchangeCurrencyCode, baseCurrencyCode].map((code) => ({ value: code, label: code }))}
+                value={currency}
+                onValueChange={setCurrency}
+              />
+            ) : (
+              <GlassInput label="Currency" value={baseCurrencyCode} disabled />
+            )}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <GlassInput label="Exchange Rate" type="number" min={0.0001} step={0.0001} value={exchangeRate} onChange={(e) => setExchangeRate(parseFloat(e.target.value) || shipmentExchangeRate)} />

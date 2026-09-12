@@ -11,6 +11,8 @@ import { GlassModal } from "@/components/ui/glass-modal";
 import { ExpenseForm } from "@/components/expenses/expense-form";
 import { formatCurrency } from "@/lib/utils";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
+import { useHasRole } from "@/hooks/use-role";
+import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
 import { Plus, Download, Upload, ArrowUp, ArrowDown, LayoutGrid, List } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { CreateExpenseInput } from "@/validations/expense.schema";
@@ -54,6 +56,7 @@ export default function ExpensesPage() {
   const [creating, setCreating] = useState(false);
   const createExpense = useCreateExpense();
   const { prefs } = useCurrencyPrefs();
+  const canSeeSummaries = useHasRole(FINANCIAL_SUMMARY_ROLE);
 
   // Adjust default view after mount to avoid SSR/client hydration mismatch
   useEffect(() => {
@@ -126,30 +129,34 @@ export default function ExpensesPage() {
         }
       />
 
-      {/* Stats row */}
+      {/* Stats row — totals are for managers and the owner; the API omits them for staff (AUDIT.md F-12) */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <div className="rounded-2xl border border-line bg-surface p-4">
           <p className="mb-1 text-xs font-medium uppercase tracking-wide text-t3">Records</p>
           <p className="text-2xl font-bold text-t1">{stats?.records ?? total}</p>
         </div>
-        <div className="rounded-2xl border border-line bg-surface p-4">
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-t3">Total Expense</p>
-          <p className="text-2xl font-bold text-accent">
-            {formatCurrency(stats?.totalAmount ?? 0, prefs.currencySymbol)}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-line bg-surface p-4">
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-t3">This Month</p>
-          <p className="text-2xl font-bold text-t1">
-            {formatCurrency(stats?.thisMonthAmount ?? 0, prefs.currencySymbol)}
-          </p>
-        </div>
-        <div className="rounded-2xl border border-line bg-surface p-4">
-          <p className="mb-1 text-xs font-medium uppercase tracking-wide text-t3">Average Expense</p>
-          <p className="text-2xl font-bold text-t1">
-            {formatCurrency(stats?.avgAmount ?? 0, prefs.currencySymbol)}
-          </p>
-        </div>
+        {canSeeSummaries && (
+          <>
+            <div className="rounded-2xl border border-line bg-surface p-4">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-t3">Total Expense</p>
+              <p className="text-2xl font-bold text-accent">
+                {formatCurrency(stats?.totalAmount ?? 0, prefs.currencySymbol)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-surface p-4">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-t3">This Month</p>
+              <p className="text-2xl font-bold text-t1">
+                {formatCurrency(stats?.thisMonthAmount ?? 0, prefs.currencySymbol)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-line bg-surface p-4">
+              <p className="mb-1 text-xs font-medium uppercase tracking-wide text-t3">Average Expense</p>
+              <p className="text-2xl font-bold text-t1">
+                {formatCurrency(stats?.avgAmount ?? 0, prefs.currencySymbol)}
+              </p>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Toolbar */}

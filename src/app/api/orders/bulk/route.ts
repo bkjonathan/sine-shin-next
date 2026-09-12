@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
 import { orders } from "@/db/schema";
 import { and, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { ORDER_STATUSES } from "@/validations/order.schema";
 import { auth } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 const bulkUpdateSchema = z.object({
   ids: z.array(z.string().min(1)).min(1, "At least one order is required"),
@@ -24,11 +24,11 @@ export async function PATCH(req: NextRequest) {
 
     const { ids, status } = parsed.data;
 
-    const updated = await db
+    const updated = await withAudit(req, session, (tx) => tx
       .update(orders)
       .set({ status, updatedAt: new Date() })
       .where(and(inArray(orders.id, ids), isNull(orders.deletedAt)))
-      .returning({ id: orders.id });
+      .returning({ id: orders.id }));
 
     return NextResponse.json({ data: { count: updated.length, ids: updated.map((o) => o.id) } });
   } catch (err) {

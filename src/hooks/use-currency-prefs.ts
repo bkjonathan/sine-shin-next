@@ -1,35 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
+import { useSettings } from "@/hooks/use-settings";
+import { shopCurrency } from "@/lib/currency";
 
-export interface CurrencyPrefs {
-  currencyCode:           string;
-  currencySymbol:         string;
-  exchangeCurrencyCode:   string;
-  exchangeCurrencySymbol: string;
-  exchangeRate:           number;
-}
-
-export const CURRENCY_DEFAULTS: CurrencyPrefs = {
-  currencyCode:           "USD",
-  currencySymbol:         "$",
-  exchangeCurrencyCode:   "MMK",
-  exchangeCurrencySymbol: "Ks",
-  exchangeRate:           1,
-};
-
+/**
+ * The shop's currency codes, symbols and default exchange rate. They come from
+ * shop settings on the server, not from this browser, so every user formats and
+ * converts money the same way (AUDIT.md F-11). Until settings load this returns
+ * the shop defaults, so money calculations should use the server-rendered shop
+ * row instead (see cargo-detail-client.tsx).
+ */
 export function useCurrencyPrefs() {
-  const [prefs, setPrefs] = useState<CurrencyPrefs>(CURRENCY_DEFAULTS);
-
-  useEffect(() => {
-    const stored = localStorage.getItem("currency-prefs");
-    if (stored) setPrefs(JSON.parse(stored));
-  }, []);
-
-  function update(next: CurrencyPrefs) {
-    setPrefs(next);
-    localStorage.setItem("currency-prefs", JSON.stringify(next));
-  }
-
-  return { prefs, update };
+  const { data } = useSettings();
+  const prefs = useMemo(() => shopCurrency(data), [data]);
+  return { prefs };
 }

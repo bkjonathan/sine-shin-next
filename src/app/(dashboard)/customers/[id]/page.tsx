@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { customers, orders } from "@/db/schema";
-import { eq, isNull, and } from "drizzle-orm";
+import { customers, orders, shopSettings } from "@/db/schema";
+import { eq, isNull, and, getTableColumns } from "drizzle-orm";
+import { orderTotalSql } from "@/lib/order-money-sql";
+import { shopCurrency } from "@/lib/currency";
 import { GlassCard } from "@/components/ui/glass-card";
 import { PageHeader } from "@/components/layout/page-header";
 import { CustomerStats } from "@/components/customers/customer-stats";
@@ -26,15 +28,20 @@ export default async function CustomerDetailPage({ params }: Props) {
 
   if (!customer) notFound();
 
+  // orderTotal: what the customer is charged — items + all fees (F-10).
   const customerOrders = await db
-    .select()
+    .select({ ...getTableColumns(orders), orderTotal: orderTotalSql })
     .from(orders)
     .where(and(eq(orders.customerId, id), isNull(orders.deletedAt)))
     .orderBy(orders.createdAt);
 
+  // Amounts are in the shop's base currency (AUDIT.md F-11).
+  const [shop] = await db.select().from(shopSettings).limit(1);
+  const { currencySymbol } = shopCurrency(shop);
+
   const totalSpent = customerOrders
     .filter((o) => o.status === "completed")
-    .reduce((s, o) => s + o.shippingFee + o.deliveryFee + o.cargoFee + o.serviceFee, 0);
+    .reduce((s, o) => s + Number(o.orderTotal), 0);
 
   return (
     <div className="space-y-6">
@@ -43,7 +50,7 @@ export default async function CustomerDetailPage({ params }: Props) {
         description={customer.customerId}
       />
 
-      <CustomerStats customer={customer} orderCount={customerOrders.length} totalSpent={totalSpent} />
+      <CustomerStats customer={customer} orderCount={customerOrders.length} totalSpent={totalSpent} currencySymbol={currencySymbol} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Profile */}
@@ -87,7 +94,7 @@ export default async function CustomerDetailPage({ params }: Props) {
                   </div>
                   <div className="flex items-center gap-3">
                     <OrderStatusBadge status={order.status} />
-                    <span className="text-sm font-semibold text-t1">{formatCurrency(order.shippingFee + order.deliveryFee + order.cargoFee + order.serviceFee)}</span>
+                    <span className="text-sm font-semibold text-t1">{formatCurrency(Number(order.orderTotal), currencySymbol)}</span>
                   </div>
                 </Link>
               ))

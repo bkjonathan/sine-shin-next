@@ -75,7 +75,7 @@ export default function OrdersPage() {
       o.customerName ?? "",
       o.status,
       new Date(o.createdAt).toLocaleDateString(),
-      String((o.shippingFee ?? 0) + (o.deliveryFee ?? 0) + (o.cargoFee ?? 0) + (o.serviceFee ?? 0)),
+      String(o.orderTotal ?? 0),
     ]);
     const csv = [header, ...body].map(r => r.map(v => `"${v}"`).join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
@@ -270,6 +270,7 @@ type OrderRow = {
   deliveryFee: number;
   cargoFee: number;
   serviceFee: number;
+  orderTotal: number;
   createdAt: Date | string;
   customerName?: string | null;
   totalQty?: number | null;
@@ -293,7 +294,7 @@ function OrderGrid({ orders, isLoading }: { orders: OrderRow[]; isLoading?: bool
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
       {orders.map((o) => {
-        const total = (o.shippingFee ?? 0) + (o.deliveryFee ?? 0) + (o.cargoFee ?? 0) + (o.serviceFee ?? 0);
+        const total = o.orderTotal ?? 0;
         const statusColors: Record<string, string> = {
           completed: "bg-green-500/15 text-green-400",
           ordered: "bg-yellow-500/15 text-yellow-400",

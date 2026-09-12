@@ -44,7 +44,8 @@ export function InvoiceDownloadTemplate({
     cargoFee: order.cargoFee ?? 0,
     serviceFeeAmount,
   });
-  const totalQty = items.reduce((s, i) => s + (i.productQty ?? 0), 0);
+  // No quantity counts as 1, as it does in the line amount (src/lib/order-money.ts).
+  const totalQty = items.reduce((s, i) => s + (i.productQty ?? 1), 0);
   const totalWeight = items.reduce((s, i) => s + (i.productWeight ?? 0), 0);
 
   return (
@@ -164,7 +165,7 @@ export function InvoiceDownloadTemplate({
                     {item.productUrl ?? "—"}
                   </td>
                   <td style={{ padding: 12, fontSize: 13, color: "#334155", textAlign: "right" }}>
-                    {item.productQty ?? 0}
+                    {item.productQty ?? 1}
                   </td>
                   <td style={{ padding: 12, fontSize: 13, color: "#334155", textAlign: "right" }}>
                     {formatPrice(item.price ?? 0)}

@@ -14,9 +14,20 @@ import { CargoAnalysisChart } from "@/components/reports/CargoAnalysisChart";
 import { MonthlyOrderVolumeChart } from "@/components/reports/MonthlyOrderVolumeChart";
 import { CustomerGrowthChart } from "@/components/reports/CustomerGrowthChart";
 import { useReportsData } from "@/hooks/use-reports";
+import { RequireRole } from "@/components/layout/require-role";
+import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
 import { periodToDates, firstOfMonthStr, todayStr } from "@/utils/dateUtils";
 
+// /api/reports is for managers and the owner (AUDIT.md F-12).
 export default function ReportsPage() {
+  return (
+    <RequireRole min={FINANCIAL_SUMMARY_ROLE}>
+      <ReportsContent />
+    </RequireRole>
+  );
+}
+
+function ReportsContent() {
   const [period, setPeriod] = useState<ReportPeriod>("6months");
   const [customFrom, setCustomFrom] = useState(firstOfMonthStr());
   const [customTo, setCustomTo] = useState(todayStr());

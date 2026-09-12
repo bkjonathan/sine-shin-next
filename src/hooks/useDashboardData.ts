@@ -8,6 +8,7 @@ import { calculateDashboardStats } from "@/utils/calculations";
 
 interface RawResponse {
   data: DashboardOrder[];
+  meta?: { expensesTotal: number };
 }
 
 function buildQueryString(filters: Partial<DashboardFilterParams>): string {
@@ -26,14 +27,15 @@ export function useDashboardData(filters: Partial<DashboardFilterParams> = {}) {
     queryFn: async () => {
       const qs = buildQueryString(filters);
       const { data } = await api.get<RawResponse>(`/dashboard/orders${qs}`);
-      return data.data;
+      // Profit subtracts the expenses of the same period (AUDIT.md F-10).
+      return { orders: data.data, expensesTotal: data.meta?.expensesTotal ?? 0 };
     },
   });
 
   const stats = useMemo<DashboardStats | null>(() => {
     if (!raw) return null;
-    return calculateDashboardStats(raw, []);
+    return calculateDashboardStats(raw.orders, raw.expensesTotal);
   }, [raw]);
 
-  return { orders: raw ?? [], stats, isLoading, error };
+  return { orders: raw?.orders ?? [], stats, isLoading, error };
 }

@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { cargoShipments } from "@/db/schema";
 import { isNull, sql, and, desc } from "drizzle-orm";
-import { auth } from "@/lib/auth";
+import { auth, roleAtLeast } from "@/lib/auth";
+import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
 import type { CargoShipmentListItem } from "@/types";
 import type { DashboardCargoStats, DashboardCargoData } from "@/types/dashboard";
 
@@ -44,7 +45,7 @@ export async function GET(req: NextRequest) {
       .where(where)
       .orderBy(desc(cargoShipments.createdAt));
 
-    const stats: DashboardCargoStats = {
+    const stats: Required<DashboardCargoStats> = {
       total_shipments: rows.length,
       pending: 0,
       in_transit: 0,
@@ -75,7 +76,15 @@ export async function GET(req: NextRequest) {
       receiverOwed: Number(r.receiverOwed ?? 0),
     }));
 
-    const data: DashboardCargoData = { stats, recent };
+    // Carrier cost and receiver revenue totals are money summaries for managers and
+    // the owner (AUDIT.md F-12). Counts, weight and each shipment's own amounts
+    // (as on the cargo list) stay for staff.
+    const data: DashboardCargoData = {
+      stats: roleAtLeast(session, FINANCIAL_SUMMARY_ROLE)
+        ? stats
+        : { ...stats, carrier_owed: undefined, receiver_owed: undefined },
+      recent,
+    };
     return NextResponse.json({ data });
   } catch (err) {
     console.error("[GET /api/dashboard/cargo]", err);

@@ -1,0 +1,15 @@
+# Keep secrets and local build artefacts out of the Docker build context
+# (AUDIT.md F-21). Secrets are supplied to the container at runtime, and the
+# Dockerfile installs Linux node_modules itself with `npm ci`.
+.env
+.env.*
+node_modules
+.next
+.git
+memory
+.claude
+tests
+coverage
+AUDIT.md
+npm-debug.log*
+.DS_Store

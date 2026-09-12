@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { z } from "zod";
@@ -44,6 +45,12 @@ export function CargoShipmentForm({ defaultValues, onSubmit, isLoading, onCancel
       notes: defaultValues?.notes ?? "",
     },
   });
+
+  // defaultValues are read once, often before shop settings have loaded; apply
+  // the shop's default rate to a new shipment when it arrives, as the order form does.
+  useEffect(() => {
+    if (defaultValues?.exchangeRate == null) setValue("exchangeRate", prefs.exchangeRate);
+  }, [defaultValues?.exchangeRate, prefs.exchangeRate, setValue]);
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

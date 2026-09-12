@@ -140,7 +140,7 @@ export function InvoicePrintLayout({
                 {item.productUrl ?? "—"}
               </td>
               <td style={{ padding: "16px 0", fontSize: 14, color: "#334155", textAlign: "right" }}>
-                {item.productQty ?? 0}
+                {item.productQty ?? 1}
               </td>
               <td style={{ padding: "16px 0", fontSize: 14, color: "#334155", textAlign: "right" }}>
                 {formatPrice(item.price ?? 0)}

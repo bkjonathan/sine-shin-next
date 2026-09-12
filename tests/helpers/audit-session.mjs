@@ -30,6 +30,24 @@ export function auditDb() {
   return postgres(DB_URL, { max: 2, onnotice: () => {} });
 }
 
+/**
+ * Brings a database built from migrations in line with the columns the app
+ * uses (AUDIT.md F-33), so routes such as /api/reports and expense creation
+ * work: migration 0000 names expenses.title and expenses.expense_date as
+ * `description` and `date`, and no migration creates expenses.expense_id or
+ * cargo_items.note. Mirrors what `db:push` must have done. Throwaway DBs only.
+ */
+export async function alignSchemaWithApp(sql) {
+  const cols = new Set(
+    (await sql`select column_name from information_schema.columns
+               where table_schema = current_schema() and table_name = 'expenses'`).map((r) => r.column_name)
+  );
+  if (cols.has("description") && !cols.has("title")) await sql`alter table expenses rename column description to title`;
+  if (cols.has("date") && !cols.has("expense_date")) await sql`alter table expenses rename column date to expense_date`;
+  await sql`alter table expenses add column if not exists expense_id varchar(50)`;
+  await sql`alter table cargo_items add column if not exists note text`;
+}
+
 /** Inserts or resets a user row. The default password hash never matches a login. */
 export async function upsertUser(sql, { id, role, username = id, passwordHash = "!unusable", sessionVersion = 0 }) {
   await sql`

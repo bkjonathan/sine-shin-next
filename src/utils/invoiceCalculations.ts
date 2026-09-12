@@ -1,4 +1,5 @@
 import type { Order, OrderItem } from "@/types";
+import { lineAmount, itemsSubtotal as sumItems, orderMoney } from "@/lib/order-money";
 
 export function formatPrice(amount: number): string {
   return new Intl.NumberFormat("en-US", {
@@ -8,7 +9,7 @@ export function formatPrice(amount: number): string {
 }
 
 export function calculateLineAmount(price: number | null, qty: number | null): number {
-  return (price ?? 0) * (qty ?? 1);
+  return lineAmount(price, qty);
 }
 
 export function calculateTotalFees({
@@ -26,24 +27,19 @@ export function calculateTotalFees({
 }
 
 /**
- * Same total-calculation logic used for the invoice: items subtotal + all fees,
- * converted at the order's exchange rate. Shared by the invoice and the
- * payment-received receipt so both documents always agree on the total.
+ * Invoice totals: items subtotal + all fees, converted at the order's exchange
+ * rate. Shared by the invoice and the payment-received receipt so both documents
+ * always agree, and computed by the shop-wide definitions in src/lib/order-money.ts.
  */
 export function calculateOrderTotals(
-  order: Pick<Order, "shippingFee" | "deliveryFee" | "cargoFee" | "serviceFee" | "serviceFeeType" | "exchangeRate">,
-  items: Pick<OrderItem, "price" | "productQty">[]
+  order: Pick<
+    Order,
+    | "shippingFee" | "deliveryFee" | "cargoFee" | "serviceFee" | "serviceFeeType" | "exchangeRate"
+    | "productDiscount" | "shippingFeeByShop" | "deliveryFeeByShop" | "cargoFeeByShop"
+  >,
+  items: (Pick<OrderItem, "price" | "productQty"> & { deletedAt?: Date | string | null })[]
 ) {
-  const itemsSubtotal = items.reduce((s, i) => s + calculateLineAmount(i.price, i.productQty), 0);
-  const isPercentFee = order.serviceFeeType === "%" || order.serviceFeeType === "percent";
-  const serviceFeeAmount = isPercentFee ? itemsSubtotal * (order.serviceFee / 100) : order.serviceFee;
-  const feesTotal = calculateTotalFees({
-    shippingFee: order.shippingFee,
-    deliveryFee: order.deliveryFee,
-    cargoFee: order.cargoFee,
-    serviceFeeAmount,
-  });
-  const orderTotal = itemsSubtotal + feesTotal;
+  const { itemsSubtotal, serviceFeeAmount, feesTotal, orderTotal } = orderMoney(order, sumItems(items));
   const totalWithExchange = orderTotal * order.exchangeRate;
   return { itemsSubtotal, serviceFeeAmount, feesTotal, orderTotal, totalWithExchange };
 }

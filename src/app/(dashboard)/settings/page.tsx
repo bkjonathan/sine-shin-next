@@ -7,12 +7,13 @@ import type { z } from "zod";
 import {
   Settings, User, Palette, Database, Cloud,
   Sun, Moon, Check, Trash2, Users, ShoppingCart, Receipt,
-  RotateCcw, Trash, Search, AlertTriangle, Plane, Plus, Pencil,
+  RotateCcw, Trash, Search, AlertTriangle, Plane, Plus, Pencil, History,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import { useTheme, type ThemeAccent, type FontSize } from "@/contexts/theme-context";
 import { useSettings, useUpdateSettings, useChangePassword } from "@/hooks/use-settings";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
+import { CURRENCY_DEFAULTS } from "@/lib/currency";
 import {
   useCargoCategories,
   useCreateCargoCategory,
@@ -36,10 +37,12 @@ import { GlassButton } from "@/components/ui/glass-button";
 import { GlassModal } from "@/components/ui/glass-modal";
 import { PageHeader } from "@/components/layout/page-header";
 import UsersPage from "@/app/(dashboard)/users/page";
+import { ActivityPanel } from "@/components/settings/activity-panel";
+import { useHasRole } from "@/hooks/use-role";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Tab = "general" | "account" | "appearance" | "users" | "data" | "sync" | "trash" | "cargo";
+type Tab = "general" | "account" | "appearance" | "users" | "data" | "sync" | "trash" | "cargo" | "activity";
 type TrashType = "all" | "customers" | "orders" | "expenses" | "cargoShipments";
 
 interface NavItem {
@@ -57,6 +60,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: "data",       label: "Data",              icon: Database  },
   { id: "sync",       label: "Sync",              icon: Cloud     },
   { id: "trash",      label: "Trash",             icon: Trash2    },
+  // Owner only, like /api/audit-log behind it (AUDIT.md F-14).
+  { id: "activity",   label: "Activity",          icon: History   },
 ];
 
 // ─── Accent colours ───────────────────────────────────────────────────────────
@@ -140,10 +145,6 @@ function SettingRow({
 function GeneralPanel() {
   const { data: settings } = useSettings();
   const updateSettings = useUpdateSettings();
-  const { prefs, update } = useCurrencyPrefs();
-  const [currency, setCurrency] = useState(prefs);
-
-  useEffect(() => { setCurrency(prefs); }, [prefs]);
 
   const {
     register,
@@ -160,6 +161,11 @@ function GeneralPanel() {
       customerIdPrefix: "CUST",
       orderIdPrefix:    "ORD",
       cargoIdPrefix:    "CG",
+      currencyCode:           CURRENCY_DEFAULTS.currencyCode,
+      currencySymbol:         CURRENCY_DEFAULTS.currencySymbol,
+      exchangeCurrencyCode:   CURRENCY_DEFAULTS.exchangeCurrencyCode,
+      exchangeCurrencySymbol: CURRENCY_DEFAULTS.exchangeCurrencySymbol,
+      defaultExchangeRate:    CURRENCY_DEFAULTS.exchangeRate,
     },
   });
 
@@ -173,6 +179,11 @@ function GeneralPanel() {
         customerIdPrefix: settings.customerIdPrefix,
         orderIdPrefix:    settings.orderIdPrefix,
         cargoIdPrefix:    settings.cargoIdPrefix,
+        currencyCode:           settings.currencyCode,
+        currencySymbol:         settings.currencySymbol,
+        exchangeCurrencyCode:   settings.exchangeCurrencyCode,
+        exchangeCurrencySymbol: settings.exchangeCurrencySymbol,
+        defaultExchangeRate:    settings.defaultExchangeRate,
       });
   }, [settings, reset]);
 
@@ -191,44 +202,30 @@ function GeneralPanel() {
             <GlassInput label="Cargo ID Prefix"    placeholder="CG"   error={errors.cargoIdPrefix?.message}    {...register("cargoIdPrefix")} />
           </div>
         </div>
+
+        {/* Currency – shop-wide, saved with the settings above (AUDIT.md F-11) */}
+        <SectionDivider title="Currency Settings" />
+        <p className="-mt-3 mb-4 text-xs text-t3">
+          Every amount is recorded in the base currency, so its code can&apos;t be changed once orders, expenses or cargo records exist.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <GlassInput label="Base Currency Code"       error={errors.currencyCode?.message}           {...register("currencyCode")} />
+          <GlassInput label="Base Currency Symbol"     error={errors.currencySymbol?.message}         {...register("currencySymbol")} />
+          <GlassInput label="Exchange Currency Code"   error={errors.exchangeCurrencyCode?.message}   {...register("exchangeCurrencyCode")} />
+          <GlassInput label="Exchange Currency Symbol" error={errors.exchangeCurrencySymbol?.message} {...register("exchangeCurrencySymbol")} />
+          <GlassInput
+            label="Default Exchange Rate"
+            type="number"
+            step="0.0001"
+            min="0.0001"
+            error={errors.defaultExchangeRate?.message}
+            {...register("defaultExchangeRate", { valueAsNumber: true })}
+          />
+        </div>
         <div className="mt-6 flex justify-end">
           <GlassButton type="submit" loading={updateSettings.isPending}>Save Settings</GlassButton>
         </div>
       </form>
-
-      {/* Currency – localStorage only */}
-      <SectionDivider title="Currency Settings" />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <GlassInput
-          label="Currency Code"
-          value={currency.currencyCode}
-          onChange={(e) => setCurrency({ ...currency, currencyCode: e.target.value })}
-        />
-        <GlassInput
-          label="Currency Symbol"
-          value={currency.currencySymbol}
-          onChange={(e) => setCurrency({ ...currency, currencySymbol: e.target.value })}
-        />
-        <GlassInput
-          label="Exchange Currency Code"
-          value={currency.exchangeCurrencyCode}
-          onChange={(e) => setCurrency({ ...currency, exchangeCurrencyCode: e.target.value })}
-        />
-        <GlassInput
-          label="Exchange Currency Symbol"
-          value={currency.exchangeCurrencySymbol}
-          onChange={(e) => setCurrency({ ...currency, exchangeCurrencySymbol: e.target.value })}
-        />
-        <GlassInput
-          label="Exchange Rate"
-          type="number"
-          value={currency.exchangeRate}
-          onChange={(e) => setCurrency({ ...currency, exchangeRate: parseFloat(e.target.value) || 1 })}
-        />
-      </div>
-      <div className="mt-6 flex justify-end">
-        <GlassButton onClick={() => update(currency)}>Save Currency</GlassButton>
-      </div>
     </div>
   );
 }
@@ -427,6 +424,7 @@ function formatDate(d: string | null | undefined) {
 }
 
 function TrashPanel() {
+  const { prefs } = useCurrencyPrefs();
   const [activeType, setActiveType] = useState<TrashType>("all");
   const [search, setSearch] = useState("");
   const [data, setData] = useState<TrashData>({ customers: [], orders: [], expenses: [], cargoShipments: [] });
@@ -729,7 +727,7 @@ function TrashPanel() {
                         <TrashBadge label={e.category} colorClass={EXPENSE_CATEGORY_COLORS[e.category] ?? "bg-white/10 text-t3"} />
                       </div>
                       <div className="flex items-center gap-3 mt-0.5">
-                        <span className="text-xs font-semibold text-t2">${e.amount.toLocaleString()}</span>
+                        <span className="text-xs font-semibold text-t2">{formatCurrency(e.amount, prefs.currencySymbol)}</span>
                         <span className="text-xs text-t3">{formatDate(e.date)}</span>
                         <span className="text-xs text-t3">Deleted {formatDate(e.deletedAt)}</span>
                       </div>
@@ -1030,6 +1028,8 @@ function PlaceholderPanel({ title, description }: { title: string; description: 
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<Tab>("general");
+  const isOwner = useHasRole("owner");
+  const navItems = NAV_ITEMS.filter((n) => n.id !== "activity" || isOwner);
 
   const activeNav = NAV_ITEMS.find((n) => n.id === tab);
 
@@ -1042,6 +1042,7 @@ export default function SettingsPage() {
     data:       "Import, export and manage your data",
     sync:       "Sync settings across devices",
     trash:      "View and manage deleted records",
+    activity:   "Who changed what, and when",
   };
 
   return (
@@ -1051,7 +1052,7 @@ export default function SettingsPage() {
       {/* ── Mobile: horizontal scrollable tabs ── */}
       <div className="lg:hidden">
         <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+          {navItems.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
@@ -1073,7 +1074,7 @@ export default function SettingsPage() {
       <div className="flex gap-5 items-start">
         {/* ── Desktop: sidebar nav ── */}
         <nav className="hidden lg:block w-52 shrink-0 sticky top-24 rounded-2xl border border-line bg-surface p-2 backdrop-blur-xl">
-          {NAV_ITEMS.map(({ id, label, icon: Icon }) => (
+          {navItems.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               type="button"
@@ -1113,6 +1114,7 @@ export default function SettingsPage() {
             {tab === "data"       && <PlaceholderPanel title="Data Management" description="Export and import features coming soon." />}
             {tab === "sync"       && <PlaceholderPanel title="Sync" description="Cloud sync features coming soon." />}
             {tab === "trash"      && <TrashPanel />}
+            {tab === "activity"   && isOwner && <ActivityPanel />}
           </div>
         </div>
       </div>

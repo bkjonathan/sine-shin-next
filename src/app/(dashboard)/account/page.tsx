@@ -5,6 +5,8 @@ import { useAccountSummary } from "@/hooks/useAccountSummary";
 import { GlassCard } from "@/components/ui/glass-card";
 import { formatCurrency } from "@/lib/utils";
 import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
+import { RequireRole } from "@/components/layout/require-role";
+import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 import {
   TrendingUp, TrendingDown, DollarSign, Receipt,
@@ -42,7 +44,16 @@ type Tab = "summary" | "income" | "expenses";
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
+// /api/account is for managers and the owner (AUDIT.md F-12).
 export default function AccountPage() {
+  return (
+    <RequireRole min={FINANCIAL_SUMMARY_ROLE}>
+      <AccountBook />
+    </RequireRole>
+  );
+}
+
+function AccountBook() {
   const [tab, setTab] = useState<Tab>("summary");
   const { summary, isLoading } = useAccountSummary();
   const { prefs } = useCurrencyPrefs();

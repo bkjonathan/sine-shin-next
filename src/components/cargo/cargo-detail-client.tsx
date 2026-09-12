@@ -14,7 +14,7 @@ import { CargoDetailActions } from "@/components/cargo/cargo-detail-actions";
 import { CargoInvoiceTemplate } from "@/components/cargo/CargoInvoiceTemplate";
 import { GlassButton } from "@/components/ui/glass-button";
 import { useUpdateCargoShipment } from "@/hooks/use-cargo";
-import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
+import { shopCurrency } from "@/lib/currency";
 import { calculateCargoShipmentSummary, calculateReceiverBalancesByCustomer } from "@/utils/cargoCalculations";
 import { downloadDataUrl } from "@/utils/downloadImage";
 import { formatCurrency, formatDate, cn } from "@/lib/utils";
@@ -124,7 +124,9 @@ const statusOptions = CARGO_STATUSES.map((s) => ({
 export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDetailClientProps) {
   const router = useRouter();
   const updateShipment = useUpdateCargoShipment();
-  const { prefs } = useCurrencyPrefs();
+  // Balances depend on which payments are already in the base currency, so take
+  // it from the server-rendered shop row, never from this browser (AUDIT.md F-11).
+  const prefs = shopCurrency(shop);
   const [shipment, setShipment] = useState(initialShipment);
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [isDownloadingInvoice, setIsDownloadingInvoice] = useState(false);
@@ -324,6 +326,7 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
             shipmentExchangeRate={shipment.exchangeRate}
             baseCurrencySymbol={prefs.currencySymbol}
             baseCurrencyCode={prefs.currencyCode}
+            exchangeCurrencyCode={prefs.exchangeCurrencyCode}
           />
 
           <CargoPaymentsSection
@@ -338,6 +341,7 @@ export function CargoDetailClient({ shipment: initialShipment, shop }: CargoDeta
             shipmentExchangeRate={shipment.exchangeRate}
             baseCurrencySymbol={prefs.currencySymbol}
             baseCurrencyCode={prefs.currencyCode}
+            exchangeCurrencyCode={prefs.exchangeCurrencyCode}
           />
         </div>
 

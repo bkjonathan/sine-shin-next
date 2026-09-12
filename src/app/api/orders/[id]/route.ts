@@ -4,6 +4,7 @@ import { orders, customers, orderItems } from "@/db/schema";
 import { eq, isNull, and } from "drizzle-orm";
 import { updateOrderSchema } from "@/validations/order.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function GET(
   _req: NextRequest,
@@ -52,10 +53,11 @@ export async function PATCH(
 
     const { items, ...orderData } = parsed.data;
 
-    const [updated] = await db.update(orders)
-      .set({ ...orderData })
+    // updatedAt was never set on this edit (AUDIT.md F-14).
+    const [updated] = await withAudit(req, session, (tx) => tx.update(orders)
+      .set({ ...orderData, updatedAt: new Date() })
       .where(and(eq(orders.id, id), isNull(orders.deletedAt)))
-      .returning();
+      .returning());
 
     if (!updated) return NextResponse.json({ error: "Order not found" }, { status: 404 });
 
@@ -67,7 +69,7 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const session = await auth();
@@ -75,10 +77,10 @@ export async function DELETE(
   if (!roleAtLeast(session, "manager")) return forbidden();
 
   const { id } = await params;
-  const [deleted] = await db.update(orders)
+  const [deleted] = await withAudit(req, session, (tx) => tx.update(orders)
     .set({ deletedAt: new Date() })
     .where(and(eq(orders.id, id), isNull(orders.deletedAt)))
-    .returning();
+    .returning());
 
   if (!deleted) return NextResponse.json({ error: "Order not found" }, { status: 404 });
   return NextResponse.json({ data: { success: true } });

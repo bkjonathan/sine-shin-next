@@ -12,6 +12,9 @@ import PriceCalculator from "@/components/dashboard/PriceCalculator";
 import { useCreateOrder } from "@/hooks/use-orders";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { useDashboardCargo } from "@/hooks/useDashboardCargo";
+import { useHasRole } from "@/hooks/use-role";
+import { useCurrencyPrefs } from "@/hooks/use-currency-prefs";
+import { FINANCIAL_SUMMARY_ROLE } from "@/lib/roles";
 import { DashboardFilters, type Period } from "@/components/dashboard/DashboardFilters";
 import { DashboardStatsGrid } from "@/components/dashboard/DashboardStatsGrid";
 import { DashboardCargoOverview } from "@/components/dashboard/DashboardCargoOverview";
@@ -19,7 +22,7 @@ import { DashboardDetailModal } from "@/components/dashboard/DashboardDetailModa
 import { DashboardRecentOrders } from "@/components/dashboard/DashboardRecentOrders";
 import { buildDetailRecords } from "@/utils/calculations";
 import { periodToDates, firstOfMonthStr, todayStr } from "@/utils/dateUtils";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, cn } from "@/lib/utils";
 import type { CreateOrderInput } from "@/validations/order.schema";
 import type { DashboardRecordType, DashboardDateField } from "@/types/dashboard";
 
@@ -69,6 +72,9 @@ export default function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const [calcOpen, setCalcOpen] = useState(false);
   const createOrder = useCreateOrder();
+  // Money summaries are for managers and the owner; the APIs omit them for staff (AUDIT.md F-12).
+  const canSeeSummaries = useHasRole(FINANCIAL_SUMMARY_ROLE);
+  const { prefs } = useCurrencyPrefs();
 
   // Filters
   const [period, setPeriod]         = useState<Period>("month");
@@ -157,15 +163,17 @@ export default function DashboardPage() {
                 <GlassButton variant="secondary" onClick={() => setCalcOpen(true)}>
                   <Calculator className="h-4 w-4" /> Calculator
                 </GlassButton>
-                <GlassButton variant="secondary" asChild>
-                  <Link href="/account">
-                    Account Book <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </GlassButton>
+                {canSeeSummaries && (
+                  <GlassButton variant="secondary" asChild>
+                    <Link href="/account">
+                      Account Book <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </GlassButton>
+                )}
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 lg:grid-cols-4">
+            <div className={cn("grid gap-2", canSeeSummaries ? "grid-cols-3 lg:grid-cols-4" : "grid-cols-2")}>
               <MetricChip
                 label="Orders"
                 value={isLoading ? "—" : (stats?.total_orders ?? 0)}
@@ -174,32 +182,38 @@ export default function DashboardPage() {
                 label="Customers"
                 value={isLoading ? "—" : (stats?.total_customers ?? 0)}
               />
-              <MetricChip
-                label="Net profit"
-                value={isLoading ? "—" : formatCurrency(stats?.total_profit ?? 0)}
-              />
-              <div className="col-span-3 lg:col-span-1">
-                <RevenueChip
-                  revenue={isLoading ? "—" : formatCurrency(stats?.total_revenue ?? 0)}
-                />
-              </div>
+              {canSeeSummaries && (
+                <>
+                  <MetricChip
+                    label="Net profit"
+                    value={isLoading ? "—" : formatCurrency(stats?.total_profit ?? 0, prefs.currencySymbol)}
+                  />
+                  <div className="col-span-3 lg:col-span-1">
+                    <RevenueChip
+                      revenue={isLoading ? "—" : formatCurrency(stats?.total_revenue ?? 0, prefs.currencySymbol)}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
       </GlassCard>
 
-      <div>
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-t4">
-          Financial Overview
-        </p>
-        <DashboardStatsGrid
-          stats={stats}
-          isLoading={isLoading}
-          onDrilldown={handleDrilldown}
-        />
-      </div>
+      {canSeeSummaries && (
+        <div>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-t4">
+            Financial Overview
+          </p>
+          <DashboardStatsGrid
+            stats={stats}
+            isLoading={isLoading}
+            onDrilldown={handleDrilldown}
+          />
+        </div>
+      )}
 
-      <DashboardCargoOverview cargo={cargo} isLoading={cargoLoading} />
+      <DashboardCargoOverview cargo={cargo} isLoading={cargoLoading} showTotals={canSeeSummaries} />
 
       <DashboardRecentOrders
         orders={stats?.recent_orders ?? []}

@@ -5,6 +5,7 @@ import { isNull, asc } from "drizzle-orm";
 import { nanoid } from "nanoid";
 import { createCargoCategorySchema } from "@/validations/cargo.schema";
 import { auth, roleAtLeast, forbidden } from "@/lib/auth";
+import { withAudit } from "@/lib/audit";
 
 export async function GET() {
   const session = await auth();
@@ -31,10 +32,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Validation failed", details: parsed.error.issues }, { status: 400 });
     }
 
-    const [created] = await db.insert(cargoCategories).values({
+    const [created] = await withAudit(req, session, (tx) => tx.insert(cargoCategories).values({
       id: nanoid(),
       ...parsed.data,
-    }).returning();
+    }).returning());
 
     return NextResponse.json({ data: created }, { status: 201 });
   } catch (err) {
